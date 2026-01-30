@@ -2,15 +2,16 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
   ScrollView,
   Platform,
-  ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
+import { Button } from '../components/common/Button';
+import { TextInput } from '../components/common/TextInput';
+import { colors, spacing, typography, borderRadius } from '../constants/theme';
 import authService from '../services/authService';
 
 export default function ForgotPasswordScreen({ navigation }) {
@@ -58,40 +59,35 @@ export default function ForgotPasswordScreen({ navigation }) {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.content}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>Forgot Password</Text>
-            <Text style={styles.description}>
-              Enter your email address and we'll send you a new password
-            </Text>
+          {/* Logo */}
+          <View style={styles.logoContainer}>
+            <Image
+              source={require('../assets/logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
           </View>
 
           {/* Form */}
           <View style={styles.form}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email address</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="john.doe@email.com"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                editable={!loading}
-              />
-            </View>
+            <TextInput
+              label="Email address"
+              placeholder="john.doe@email.com"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              editable={!loading}
+            />
 
-            <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
+            <Button
               onPress={handleForgotPassword}
+              loading={loading}
               disabled={loading}
+              style={styles.button}
             >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Reset Password</Text>
-              )}
-            </TouchableOpacity>
+              Reset Password
+            </Button>
           </View>
 
           {/* Back to Login */}
@@ -112,76 +108,56 @@ export default function ForgotPasswordScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.background,
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
+    paddingTop: 60,
   },
   content: {
-    padding: 24,
+    padding: spacing.lg,
     maxWidth: 500,
     width: '100%',
     alignSelf: 'center',
   },
+  logoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 0,
+    marginBottom: spacing.xl,
+  },
+  logo: {
+    width: 250,
+    height: 150,
+  },
   header: {
-    marginBottom: 32,
+    marginBottom: spacing.xl,
     alignItems: 'center',
   },
   title: {
     fontSize: 36,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 16,
+    fontWeight: typography.weights.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
   },
   description: {
-    fontSize: 16,
-    color: '#6b7280',
+    fontSize: typography.sizes.md,
+    color: colors.textSecondary,
     textAlign: 'center',
     paddingHorizontal: 20,
   },
   form: {
-    marginBottom: 24,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: '#1f2937',
+    marginBottom: spacing.lg,
   },
   button: {
-    backgroundColor: '#FF10F0',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    marginTop: spacing.md,
   },
   footer: {
     alignItems: 'center',
   },
   link: {
-    color: '#FF10F0',
-    fontWeight: '600',
-    fontSize: 16,
+    color: colors.primary,
+    fontWeight: typography.weights.semibold,
+    fontSize: typography.sizes.md,
   },
 });

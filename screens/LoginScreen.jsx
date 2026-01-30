@@ -2,16 +2,18 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
   ScrollView,
   Platform,
-  ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import authService from '../services/authService';
+import notificationService from '../services/notificationService';
+import { Button } from '../components/common/Button';
+import { TextInput } from '../components/common/TextInput';
+import { colors, spacing, typography, borderRadius } from '../constants/theme';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -28,9 +30,12 @@ export default function LoginScreen({ navigation }) {
     try {
       console.log('=== LOGIN REQUEST ===');
       console.log('Email:', email.toLowerCase());
-      console.log('Password:', password);
 
-      const response = await authService.login(email.toLowerCase(), password);
+      // Get FCM token before login (if on physical device)
+      const fcmToken = await notificationService.getTokenForLogin();
+      console.log('FCM Token:', fcmToken ? 'obtained' : 'not available');
+
+      const response = await authService.login(email.toLowerCase(), password, 'customer', fcmToken);
 
       console.log('=== LOGIN RESPONSE ===');
       console.log('Full Response:', JSON.stringify(response, null, 2));
@@ -38,10 +43,10 @@ export default function LoginScreen({ navigation }) {
       console.log('Token:', response.payload?.token);
       console.log('User:', JSON.stringify(response.payload?.user, null, 2));
 
-      // After successful login, navigate to WebView
+      // After successful login, navigate to Main
       if (response.success) {
-        console.log('Login successful, navigating to WebView...');
-        navigation.replace('WebView');
+        console.log('Login successful, navigating to Main...');
+        navigation.replace('Main');
       }
     } catch (error) {
       console.error('=== LOGIN ERROR ===');
@@ -62,6 +67,15 @@ export default function LoginScreen({ navigation }) {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.content}>
+          {/* Logo */}
+          <View style={styles.logoContainer}>
+            <Image
+              source={require('../assets/logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
+
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Login</Text>
@@ -78,42 +92,35 @@ export default function LoginScreen({ navigation }) {
 
           {/* Form */}
           <View style={styles.form}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email address</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="john.doe@email.com"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                editable={!loading}
-              />
-            </View>
+            <TextInput
+              label="Email address"
+              placeholder="john.doe@email.com"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              editable={!loading}
+              labelStyle={styles.inputLabel}
+            />
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Password</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="********"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                editable={!loading}
-              />
-            </View>
+            <TextInput
+              label="Password"
+              placeholder="********"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              editable={!loading}
+              labelStyle={styles.inputLabel}
+            />
 
-            <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
+            <Button
               onPress={handleLogin}
+              loading={loading}
               disabled={loading}
+              style={styles.button}
             >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Login</Text>
-              )}
-            </TouchableOpacity>
+              LOGIN
+            </Button>
           </View>
 
           {/* Forgot Password */}
@@ -134,71 +141,55 @@ export default function LoginScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.secondary,
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
+    paddingTop: 60,
+    paddingBottom: spacing.xl,
   },
   content: {
-    padding: 24,
+    padding: spacing.lg,
     maxWidth: 500,
     width: '100%',
-    alignSelf: 'center',
+    alignSelf: 'flex-start',
+  },
+  logoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.xl,
+    marginBottom: spacing.xl,
+  },
+  logo: {
+    width: 250,
+    height: 150,
   },
   header: {
-    marginBottom: 32,
+    marginBottom: spacing.xl,
     alignItems: 'center',
   },
   title: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 16,
+    fontSize: typography.sizes.xxxl + 8,
+    fontWeight: typography.weights.bold,
+    color: colors.white,
+    marginBottom: spacing.md,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#6b7280',
+    fontSize: typography.sizes.md,
+    color: colors.border,
   },
   link: {
-    color: '#FF10F0',
-    fontWeight: '600',
+    color: colors.primary,
+    fontWeight: typography.weights.semibold,
   },
   form: {
-    marginBottom: 24,
+    marginBottom: spacing.lg,
   },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: '#1f2937',
+  inputLabel: {
+    color: colors.background,
   },
   button: {
-    backgroundColor: '#FF10F0',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    marginTop: spacing.md,
   },
   footer: {
     alignItems: 'center',

@@ -3,13 +3,13 @@ import {
   View,
   StyleSheet,
   ActivityIndicator,
-  TouchableOpacity,
   Text,
   Alert,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import authService from '../services/authService';
 import Config from '../config';
+import { colors, spacing, typography } from '../constants/theme';
 
 const WEB_APP_URL = Config.WEB_APP_URL;
 
@@ -100,7 +100,7 @@ export default function WebViewScreen({ navigation }) {
   if (!webViewUrl) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF10F0" />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
@@ -118,7 +118,7 @@ export default function WebViewScreen({ navigation }) {
         startInLoadingState={true}
         renderLoading={() => (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FF10F0" />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         )}
         // Allow navigation within the web app
@@ -132,7 +132,7 @@ export default function WebViewScreen({ navigation }) {
 
       {loading && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#FF10F0" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       )}
     </View>
@@ -142,7 +142,7 @@ export default function WebViewScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.white,
   },
   webview: {
     flex: 1,
@@ -151,17 +151,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.secondary,
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#6b7280',
+    marginTop: spacing.md,
+    fontSize: typography.sizes.md,
+    color: colors.border,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
   },
 });
