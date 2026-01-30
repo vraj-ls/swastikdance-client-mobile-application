@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "391502244252",
+    "project_id": "swastik-dance-app",
+    "storage_bucket": "swastik-dance-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:391502244252:android:219f5893b50bd0275a8059",
+        "android_client_info": {
+          "package_name": "com.swastikdance.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAf1tw9ZZAQZVqmRc2Nhuku14_a8yFfYH4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

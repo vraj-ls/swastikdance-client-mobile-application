@@ -39,3 +39,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Note: Firebase config files (google-services.json, GoogleService-Info.plist)
+# are safe to commit - they contain public API keys meant for client apps.
+# Security comes from Firebase Security Rules, not from hiding these files.
