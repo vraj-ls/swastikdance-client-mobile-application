@@ -138,7 +138,9 @@ export default function App() {
           <Stack.Screen
             name="WebView"
             component={WebViewScreen}
-            options={{ headerShown: false }}
+            options={{
+              title: "Swastik Dance", // Default title, will be updated dynamically
+            }}
           />
         </Stack.Navigator>
       </NavigationContainer>

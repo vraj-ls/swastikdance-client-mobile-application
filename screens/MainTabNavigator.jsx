@@ -1,6 +1,8 @@
 import React, { useState } from "react";
-import { View, TouchableOpacity, Text, StyleSheet, Modal } from "react-native";
+import { View, TouchableOpacity, Text, StyleSheet, Modal, Platform } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
 import {
   Bell,
   Home,
@@ -12,6 +14,9 @@ import {
   UserPlus,
   Dumbbell,
   BookOpen,
+  Music,
+  Key,
+  GraduationCap,
 } from "lucide-react-native";
 import DashboardScreen from "./DashboardScreen";
 import NotificationScreen from "./NotificationScreen";
@@ -47,12 +52,22 @@ const TabIcon = ({ focused, label }) => {
 // Floating Action Button with Menu
 const FloatingActionButton = () => {
   const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+
+  // Position FAB above the tab bar with proper spacing
+  const TAB_BAR_HEIGHT = Platform.OS === 'ios' ? 49 : 56;
+  const fabBottom = TAB_BAR_HEIGHT + insets.bottom + 16;
 
   const menuItems = [
-    { id: 1, label: "Pass", icon: "ticket" },
-    { id: 2, label: "Enrolment", icon: "fileText" },
-    { id: 3, label: "Training", icon: "dumbbell" },
-    { id: 4, label: "Course", icon: "bookOpen" },
+    { id: 1, label: "Pass", icon: "ticket", route: "/pass" },
+    { id: 2, label: "Enrolment", icon: "fileText", route: "/enrolment" },
+    { id: 3, label: "Training", icon: "dumbbell", route: "/training" },
+    { id: 4, label: "Products", icon: "bookOpen", route: "/order" },
+    { id: 5, label: "Performance", icon: "music", route: "/performance" },
+    { id: 6, label: "Hall Hire", icon: "key", route: "/hire" },
+    { id: 7, label: "Workshop", icon: "graduationCap", route: "/admission" },
+    { id: 8, label: "Debug", icon: "dumbbell", route: "/debug" },
   ];
 
   const getMenuIcon = (iconName) => {
@@ -68,6 +83,12 @@ const FloatingActionButton = () => {
         return <Dumbbell {...iconProps} />;
       case "bookOpen":
         return <BookOpen {...iconProps} />;
+      case "music":
+        return <Music {...iconProps} />;
+      case "key":
+        return <Key {...iconProps} />;
+      case "graduationCap":
+        return <GraduationCap {...iconProps} />;
       default:
         return null;
     }
@@ -75,8 +96,9 @@ const FloatingActionButton = () => {
 
   const handleMenuItemPress = (item) => {
     setIsMenuVisible(false);
-    // Handle menu item action
-    console.log("Menu item pressed:", item.label);
+    // Navigate to WebView with the target route
+    console.log("Menu item pressed:", item.label, "- navigating to:", item.route);
+    navigation.navigate("WebView", { targetRoute: item.route });
   };
 
   return (
@@ -89,7 +111,7 @@ const FloatingActionButton = () => {
         onRequestClose={() => setIsMenuVisible(false)}
       >
         <TouchableOpacity
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { paddingBottom: fabBottom + 70 }]}
           activeOpacity={1}
           onPress={() => setIsMenuVisible(false)}
         >
@@ -117,7 +139,7 @@ const FloatingActionButton = () => {
 
       {/* FAB Button */}
       <TouchableOpacity
-        style={styles.fab}
+        style={[styles.fab, { bottom: fabBottom }]}
         onPress={() => setIsMenuVisible(!isMenuVisible)}
         activeOpacity={0.8}
       >
@@ -132,6 +154,12 @@ const FloatingActionButton = () => {
 };
 
 export default function MainTabNavigator() {
+  const insets = useSafeAreaInsets();
+
+  // Calculate tab bar height based on platform and safe area
+  const TAB_BAR_HEIGHT = Platform.OS === 'ios' ? 49 : 56;
+  const tabBarHeight = TAB_BAR_HEIGHT + insets.bottom;
+
   return (
     <View style={{ flex: 1 }}>
       <Tab.Navigator
@@ -144,12 +172,15 @@ export default function MainTabNavigator() {
             fontWeight: "bold",
           },
           tabBarStyle: {
+            position: 'absolute',
             backgroundColor: "#ffffff",
             borderTopColor: "#e5e7eb",
-            borderTopWidth: 1,
-            height: 60,
-            paddingBottom: 8,
+            borderTopWidth: 0.5,
+            height: tabBarHeight,
+            paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
             paddingTop: 8,
+            elevation: 0,
+            shadowOpacity: 0,
           },
           tabBarActiveTintColor: "#E55A28",
           tabBarInactiveTintColor: "#6b7280",
@@ -201,9 +232,7 @@ const styles = StyleSheet.create({
   tabIconContainer: {
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: 4,
     width: "100%",
-    maxWidth: 80,
   },
   tabLabel: {
     fontSize: 9,
@@ -221,7 +250,7 @@ const styles = StyleSheet.create({
   fab: {
     position: "absolute",
     right: 20,
-    bottom: 80,
+    // bottom is now set dynamically based on safe area
     width: 60,
     height: 60,
     borderRadius: 30,
@@ -242,7 +271,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "flex-end",
-    paddingBottom: 150,
+    // paddingBottom is now set dynamically based on safe area
     paddingRight: 20,
   },
   menuContainer: {

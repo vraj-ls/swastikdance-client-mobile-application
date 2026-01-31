@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -13,13 +13,39 @@ import { colors, spacing, typography } from '../constants/theme';
 
 const WEB_APP_URL = Config.WEB_APP_URL;
 
-export default function WebViewScreen({ navigation }) {
+// Route to title mapping for native app bar
+const ROUTE_TITLES = {
+  '/enrolment': 'Class Enrolment',
+  '/pass': 'Class Pass',
+  '/training': 'Private Training',
+  '/order': 'Products Order',
+  '/performance': 'Event Performance',
+  '/hire': 'Hall Hire',
+  '/admission': 'Workshop Admission',
+  '/transactions': 'Transactions',
+  '': 'Swastik Dance', // Default for empty route
+};
+
+export default function WebViewScreen({ navigation, route }) {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const [webViewUrl, setWebViewUrl] = useState(null);
+  const webViewRef = useRef(null);
+
+  // Get target route from params (default to empty for enrolment page)
+  const { targetRoute = '' } = route.params || {};
+
+  // Set header title based on route
+  useEffect(() => {
+    const title = ROUTE_TITLES[targetRoute] || 'Swastik Dance';
+    navigation.setOptions({
+      title: title,
+    });
+  }, [targetRoute, navigation]);
 
   useEffect(() => {
     console.log('=== WebViewScreen MOUNTED ===');
+    console.log('WebViewScreen: Target route:', targetRoute);
     loadToken();
   }, []);
 
@@ -33,8 +59,13 @@ export default function WebViewScreen({ navigation }) {
 
       if (savedToken) {
         setToken(savedToken);
-        const url = `${WEB_APP_URL}/mobile-auth?token=${savedToken}`;
-        console.log('WebViewScreen: Setting WebView URL:', url);
+
+        // Build URL with token parameter directly to target page
+        const targetPath = targetRoute || '/enrolment';
+        const url = `${WEB_APP_URL}${targetPath}?token=${encodeURIComponent(savedToken)}`;
+
+        console.log('WebViewScreen: Setting WebView URL with token parameter');
+        console.log('WebViewScreen: Target URL:', url);
 
         // Validate URL
         if (!WEB_APP_URL || WEB_APP_URL.includes('localhost')) {
@@ -44,7 +75,6 @@ export default function WebViewScreen({ navigation }) {
 
         setWebViewUrl(url);
       } else {
-        // No token found, navigate to login
         console.log('WebViewScreen: No token found, navigating to Login...');
         navigation.replace('Login');
       }
@@ -55,19 +85,18 @@ export default function WebViewScreen({ navigation }) {
   };
 
   const handleNavigationStateChange = async (navState) => {
-    const { url } = navState;
+    const { url, loading, title, canGoBack, canGoForward } = navState;
     console.log('WebViewScreen: Navigation changed to:', url);
+    console.log('WebViewScreen: Page title:', title);
 
     // Check if user navigated to login page (logout or session expired)
     if (url && url.includes('/login')) {
       console.log('WebViewScreen: Logout detected! User navigated to login page');
       console.log('WebViewScreen: Clearing tokens and navigating to native login...');
 
-      // Clear tokens from AsyncStorage
       await authService.clearAuth();
       console.log('WebViewScreen: Tokens cleared successfully');
 
-      // Navigate back to native login screen
       navigation.replace('Login');
     }
   };
@@ -75,11 +104,17 @@ export default function WebViewScreen({ navigation }) {
   const handleWebViewLoad = () => {
     console.log('WebViewScreen: WebView loaded successfully');
     setLoading(false);
+
+    // No need for post-load auth check anymore
+    // Token is in URL, handled by MobileAuth page
   };
 
   const handleWebViewError = (syntheticEvent) => {
     const { nativeEvent } = syntheticEvent;
     console.error('WebViewScreen: WebView error:', nativeEvent);
+    console.error('WebViewScreen: Error description:', nativeEvent.description);
+    console.error('WebViewScreen: Error domain:', nativeEvent.domain);
+    console.error('WebViewScreen: Error code:', nativeEvent.code);
     Alert.alert(
       'Connection Error',
       'Unable to load the app. Please check your internet connection.',
@@ -97,11 +132,29 @@ export default function WebViewScreen({ navigation }) {
     );
   };
 
-  if (!webViewUrl) {
+  const handleWebViewMessage = (event) => {
+    try {
+      const message = JSON.parse(event.nativeEvent.data);
+      console.log('📱 WebView Message:', message.type, message.data);
+    } catch (e) {
+      console.log('📱 WebView Message (raw):', event.nativeEvent.data);
+    }
+  };
+
+  const handleHttpError = (syntheticEvent) => {
+    const { nativeEvent } = syntheticEvent;
+    console.error('WebViewScreen: HTTP error:', nativeEvent);
+    console.error('WebViewScreen: Status code:', nativeEvent.statusCode);
+    console.error('WebViewScreen: URL:', nativeEvent.url);
+  };
+
+  if (!webViewUrl || !token) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading...</Text>
+        <Text style={styles.loadingText}>
+          {!token ? 'Loading token...' : 'Loading...'}
+        </Text>
       </View>
     );
   }
@@ -110,24 +163,28 @@ export default function WebViewScreen({ navigation }) {
     <View style={styles.container}>
       {/* WebView */}
       <WebView
+        ref={webViewRef}
         source={{ uri: webViewUrl }}
         style={styles.webview}
         onLoad={handleWebViewLoad}
         onError={handleWebViewError}
+        onHttpError={handleHttpError}
         onNavigationStateChange={handleNavigationStateChange}
+        onMessage={handleWebViewMessage}
         startInLoadingState={true}
         renderLoading={() => (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
           </View>
         )}
-        // Allow navigation within the web app
         allowsBackForwardNavigationGestures={true}
-        // Enable JavaScript
         javaScriptEnabled={true}
-        // Allow cookies for session management
+        domStorageEnabled={true}
         thirdPartyCookiesEnabled={true}
         sharedCookiesEnabled={true}
+        onConsoleMessage={(message) => {
+          console.log('WebView Console:', message.nativeEvent.message);
+        }}
       />
 
       {loading && (

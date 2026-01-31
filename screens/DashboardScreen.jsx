@@ -475,6 +475,13 @@ export default function DashboardScreen() {
               <Text style={styles.emptyText}>No pending payments</Text>
             </View>
           )}
+          <Button
+            variant="outline"
+            onPress={() => navigation.navigate("WebView", { targetRoute: '/transactions' })}
+            style={styles.viewTransactionsButton}
+          >
+            View All Transactions
+          </Button>
         </View>
 
         {/* Student Listing Section */}
@@ -752,6 +759,9 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
   },
   addStudentButton: {
+    marginTop: spacing.md,
+  },
+  viewTransactionsButton: {
     marginTop: spacing.md,
   },
   // Bottom Sheet Styles

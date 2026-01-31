@@ -228,18 +228,26 @@ class NotificationService {
   cleanup() {
     console.log('🔔 [NOTIFICATIONS] Cleaning up listeners...');
 
-    if (this.notificationListener) {
-      Notifications.removeNotificationSubscription(this.notificationListener);
+    try {
+      if (this.notificationListener) {
+        this.notificationListener.remove();
+        this.notificationListener = null;
+      }
+
+      if (this.responseListener) {
+        this.responseListener.remove();
+        this.responseListener = null;
+      }
+
+      this.isInitialized = false;
+      console.log('🔔 [NOTIFICATIONS] Cleanup complete');
+    } catch (error) {
+      console.error('🔔 [NOTIFICATIONS] Error during cleanup:', error);
+      // Still mark as cleaned up even if error occurs
       this.notificationListener = null;
-    }
-
-    if (this.responseListener) {
-      Notifications.removeNotificationSubscription(this.responseListener);
       this.responseListener = null;
+      this.isInitialized = false;
     }
-
-    this.isInitialized = false;
-    console.log('🔔 [NOTIFICATIONS] Cleanup complete');
   }
 }
 

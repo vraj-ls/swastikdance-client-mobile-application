@@ -9,7 +9,7 @@ import {
   Image,
   ActivityIndicator,
 } from 'react-native';
-import { Edit, Lock, Bell, HelpCircle, Info, LogOut, ChevronRight, UserPlus } from 'lucide-react-native';
+import { Edit, Lock, Bell, HelpCircle, Info, LogOut, ChevronRight, UserPlus, Wallet } from 'lucide-react-native';
 import { Button } from '../components/common/Button';
 import { colors, spacing, typography, borderRadius } from '../constants/theme';
 import authService from '../services/authService';
@@ -162,6 +162,11 @@ export default function ProfileScreen({ navigation }) {
           icon={Lock}
           title="Change Password"
           onPress={() => navigation.navigate('ChangePassword')}
+        />
+        <ProfileOption
+          icon={Wallet}
+          title="Transaction History"
+          onPress={() => navigation.navigate('WebView', { targetRoute: '/transactions' })}
         />
         <ProfileOption
           icon={Bell}

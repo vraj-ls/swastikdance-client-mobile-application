@@ -14,13 +14,13 @@
 const Config = {
   // Backend API URL - where your Express server is running
   // IMPORTANT: Replace with your computer's IP address (found below)
-  API_URL: "http://192.168.1.3:3001/mobile",
+  API_URL: "http://192.168.1.8:3001/mobile",
 
   // Web App URL - where your React web client is running
   // IMPORTANT: Replace with your computer's IP address (found below)
-  WEB_APP_URL: "http://192.168.1.3:3002",
+  WEB_APP_URL: "http://192.168.1.8:3002",
 
-  // Your computer's IP address is: 192.168.1.3
+  // Your computer's IP address is: 192.168.1.8
   // If this doesn't work, find it manually:
   // - Mac/Linux: ifconfig | grep "inet "
   // - Windows: ipconfig
