@@ -30,14 +30,16 @@ if (Platform.OS === 'android') {
 class NotificationService {
   constructor() {
     this.navigationRef = null;
-    this.foregroundFCMListener = null;
     this.notificationListener = null;
     this.responseListener = null;
+    this.backgroundOpenListener = null;
+    this.tokenRefreshListener = null;
     this.isInitialized = false;
   }
 
   /**
-   * Set the navigation reference for deep linking
+   * Set the navigation reference for deep linking.
+   * Call this from NavigationContainer's onReady callback.
    */
   setNavigationRef(ref) {
     this.navigationRef = ref;
@@ -45,8 +47,8 @@ class NotificationService {
   }
 
   /**
-   * Initialize notification listeners
-   * Call this in App.js on mount
+   * Initialize notification listeners.
+   * Call this in App.js on mount.
    */
   initialize() {
     if (this.isInitialized) {
@@ -56,13 +58,56 @@ class NotificationService {
 
     console.log('🔔 [NOTIFICATIONS] Initializing...');
     this.setupNotificationListeners();
+    // Fire-and-forget: re-register token if the user is already logged in.
+    // This handles the case where a user was logged in before push notifications
+    // were added, or whose FCM token has rotated since their last login.
+    this.checkAndRegisterToken();
     this.isInitialized = true;
   }
 
   /**
-   * Request permissions and get FCM token for login
-   * Returns token to be sent with login request
-   * Call this BEFORE login
+   * Check if the current FCM token differs from what the backend has, and
+   * re-register it if so. Safe to call any time; no-ops if not logged in or
+   * if permission hasn't been granted yet.
+   */
+  async checkAndRegisterToken() {
+    try {
+      const authToken = await AsyncStorage.getItem('auth_token');
+      if (!authToken) return; // Not logged in
+
+      // Don't try to get the token if the user hasn't granted permission yet
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status !== 'granted') return;
+
+      // On iOS, ensure APNs registration is active before asking for the FCM token
+      await messaging().registerDeviceForRemoteMessages();
+
+      const currentToken = await messaging().getToken();
+      if (!currentToken) return;
+
+      const storedToken = await AsyncStorage.getItem('fcm_token');
+      if (currentToken === storedToken) {
+        console.log('🔔 [NOTIFICATIONS] Token unchanged, no re-registration needed');
+        return;
+      }
+
+      // Token is new or has rotated — update local storage and backend
+      await AsyncStorage.setItem('fcm_token', currentToken);
+      await axios.put(`${API_URL}/fcm-token`, { token: currentToken }, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      console.log('🔔 [NOTIFICATIONS] Token registered on startup (was stale or missing)');
+    } catch (error) {
+      // Non-fatal — the user can still use the app, they just won't get push
+      // notifications until they log out and back in or the token refreshes.
+      console.warn('🔔 [NOTIFICATIONS] Startup token registration failed:', error.message ?? error);
+    }
+  }
+
+  /**
+   * Request permissions and get FCM token for login.
+   * Returns token to be sent with login request.
+   * Call this BEFORE login.
    */
   async getTokenForLogin() {
     try {
@@ -73,7 +118,14 @@ class NotificationService {
       let finalStatus = existingStatus;
 
       if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
+        const { status } = await Notifications.requestPermissionsAsync({
+          ios: {
+            allowAlert: true,
+            allowBadge: true,
+            allowSound: true,
+            allowAnnouncements: true,
+          },
+        });
         finalStatus = status;
       }
 
@@ -86,6 +138,9 @@ class NotificationService {
 
       // Request Firebase messaging permission (required for iOS; no-op on Android)
       await messaging().requestPermission();
+
+      // Register with APNs before requesting the FCM token (required on iOS in RNFB v7+)
+      await messaging().registerDeviceForRemoteMessages();
 
       const token = await this.getFCMToken();
       if (!token) {
@@ -105,20 +160,14 @@ class NotificationService {
    */
   async getFCMToken() {
     try {
-      // Get real FCM registration token — works with firebase-admin directly
       const token = await messaging().getToken();
 
-      console.log('🔔 [NOTIFICATIONS] Token obtained:', token);
-
-      // Print FCM token prominently for testing
       console.log('\n========================================');
       console.log('📱 FCM TOKEN:');
       console.log(token);
       console.log('========================================\n');
 
-      // Store token locally
       await AsyncStorage.setItem('fcm_token', token);
-
       return token;
     } catch (error) {
       console.error('🔔 [NOTIFICATIONS] Error getting token:', error);
@@ -127,76 +176,109 @@ class NotificationService {
   }
 
   /**
-   * Setup notification listeners for foreground and tap handling
+   * Setup all notification listeners.
    */
   setupNotificationListeners() {
-    // Handle FCM messages received while app is in foreground — show as local notification
-    this.foregroundFCMListener = messaging().onMessage(async remoteMessage => {
-      console.log('🔔 [NOTIFICATIONS] FCM foreground message:', remoteMessage);
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: remoteMessage.notification?.title ?? 'Swastik Dance',
-          body: remoteMessage.notification?.body ?? '',
-          data: remoteMessage.data ?? {},
-          sound: 'default',
-        },
-        trigger: null, // show immediately
-      });
-    });
-
-    // Listener for local notifications received while app is in foreground
+    // Local notification received while app is in foreground (from scheduleNotificationAsync)
     this.notificationListener = Notifications.addNotificationReceivedListener(notification => {
-      console.log('🔔 [NOTIFICATIONS] Received in foreground:', notification);
+      console.log('🔔 [NOTIFICATIONS] Local notification received in foreground:', notification);
     });
 
-    // Listener for notification tap (user interaction)
+    // User taps a LOCAL notification (data-only FCM messages scheduled as local notifications)
     this.responseListener = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('🔔 [NOTIFICATIONS] User tapped notification:', response);
+      console.log('🔔 [NOTIFICATIONS] User tapped local notification:', response);
       this.handleNotificationTap(response.notification);
+    });
+
+    // User taps a FCM notification while app is in BACKGROUND (not killed)
+    this.backgroundOpenListener = messaging().onNotificationOpenedApp(remoteMessage => {
+      console.log('🔔 [NOTIFICATIONS] App opened from background via FCM tap:', remoteMessage);
+      this.navigateFromData(remoteMessage.data ?? {});
+    });
+
+    // FCM token refresh — update backend with new token
+    this.tokenRefreshListener = messaging().onTokenRefresh(async (newToken) => {
+      console.log('🔔 [NOTIFICATIONS] FCM token refreshed');
+      await AsyncStorage.setItem('fcm_token', newToken);
+      try {
+        const authToken = await AsyncStorage.getItem('auth_token');
+        if (authToken) {
+          await axios.put(`${API_URL}/fcm-token`, { token: newToken }, {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+          console.log('🔔 [NOTIFICATIONS] Refreshed token sent to backend');
+        }
+      } catch (e) {
+        console.warn('🔔 [NOTIFICATIONS] Failed to update refreshed token on server:', e);
+      }
     });
 
     console.log('🔔 [NOTIFICATIONS] Listeners registered');
   }
 
   /**
-   * Handle notification tap - navigate to appropriate screen
+   * Handle app opened from a KILLED state via notification tap.
+   * Must be called after NavigationContainer is ready (onReady callback).
+   */
+  async handleInitialNotification() {
+    try {
+      const remoteMessage = await messaging().getInitialNotification();
+      if (remoteMessage) {
+        console.log('🔔 [NOTIFICATIONS] App opened from killed state via FCM tap:', remoteMessage);
+        this.navigateFromData(remoteMessage.data ?? {});
+      }
+    } catch (error) {
+      console.error('🔔 [NOTIFICATIONS] Error handling initial notification:', error);
+    }
+  }
+
+  /**
+   * Handle tap on a LOCAL notification (from expo-notifications).
+   * Used for data-only FCM messages that were scheduled as local notifications.
    */
   handleNotificationTap(notification) {
+    const data = notification?.request?.content?.data ?? {};
+    this.navigateFromData(data);
+  }
+
+  /**
+   * Central navigation handler — routes user based on notification data.type.
+   */
+  navigateFromData(data) {
     if (!this.navigationRef) {
-      console.log('🔔 [NOTIFICATIONS] Navigation ref not available');
+      console.warn('🔔 [NOTIFICATIONS] Navigation ref not set, cannot navigate');
       return;
     }
 
-    const notificationData = notification.request.content.data;
-    const type = notificationData?.type;
+    // isReady() is available on the NavigationContainer imperative handle
+    if (typeof this.navigationRef.isReady === 'function' && !this.navigationRef.isReady()) {
+      console.warn('🔔 [NOTIFICATIONS] Navigation not ready yet, skipping navigate');
+      return;
+    }
 
-    console.log('🔔 [NOTIFICATIONS] Handling tap, type:', type);
+    const type = data?.type;
+    console.log('🔔 [NOTIFICATIONS] Navigating for notification type:', type);
 
     switch (type) {
       case 'STUDENT_WELCOME':
-        // Navigate to student detail if studentId is provided
-        if (notificationData.studentId) {
-          this.navigationRef.navigate('StudentDetail', {
-            studentId: notificationData.studentId,
-          });
+        if (data.studentId) {
+          this.navigationRef.navigate('StudentDetail', { studentId: data.studentId });
         }
         break;
 
       case 'SESSION_REMINDER':
-        // Navigate to dashboard
         this.navigationRef.navigate('Dashboard');
         break;
 
       case 'GENERAL':
       default:
-        // Navigate to notifications screen
         this.navigationRef.navigate('Notifications');
         break;
     }
   }
 
   /**
-   * Clear FCM token on logout
+   * Clear FCM token on logout.
    */
   async clearToken() {
     try {
@@ -205,19 +287,17 @@ class NotificationService {
       const authToken = await AsyncStorage.getItem('auth_token');
 
       // Remove token from backend
-      await axios.delete(`${API_URL}/mobile/fcm-token`, {
+      await axios.delete(`${API_URL}/fcm-token`, {
         headers: {
           Authorization: `Bearer ${authToken}`,
         },
       });
 
-      // Remove token from local storage
       await AsyncStorage.removeItem('fcm_token');
-
       console.log('🔔 [NOTIFICATIONS] Token cleared');
     } catch (error) {
       console.error('🔔 [NOTIFICATIONS] Error clearing token:', error);
-      // Don't throw - logout should continue even if token clearing fails
+      // Don't throw — logout should continue even if token clearing fails
     }
   }
 
@@ -239,22 +319,17 @@ class NotificationService {
     try {
       await Notifications.setBadgeCountAsync(0);
     } catch (error) {
-      console.error('🔔 [NOTIFICATIONS] Error clearing badge:', error);
+      console.error('🔔 [NOTIFICATIONS] Error clearing badge count:', error);
     }
   }
 
   /**
-   * Cleanup listeners on app unmount
+   * Cleanup all listeners on app unmount
    */
   cleanup() {
     console.log('🔔 [NOTIFICATIONS] Cleaning up listeners...');
 
     try {
-      if (this.foregroundFCMListener) {
-        this.foregroundFCMListener();
-        this.foregroundFCMListener = null;
-      }
-
       if (this.notificationListener) {
         this.notificationListener.remove();
         this.notificationListener = null;
@@ -265,13 +340,25 @@ class NotificationService {
         this.responseListener = null;
       }
 
+      if (this.backgroundOpenListener) {
+        // onNotificationOpenedApp returns an unsubscribe function
+        this.backgroundOpenListener();
+        this.backgroundOpenListener = null;
+      }
+
+      if (this.tokenRefreshListener) {
+        this.tokenRefreshListener();
+        this.tokenRefreshListener = null;
+      }
+
       this.isInitialized = false;
       console.log('🔔 [NOTIFICATIONS] Cleanup complete');
     } catch (error) {
       console.error('🔔 [NOTIFICATIONS] Error during cleanup:', error);
-      // Still mark as cleaned up even if error occurs
       this.notificationListener = null;
       this.responseListener = null;
+      this.backgroundOpenListener = null;
+      this.tokenRefreshListener = null;
       this.isInitialized = false;
     }
   }
