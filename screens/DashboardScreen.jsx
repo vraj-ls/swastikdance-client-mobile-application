@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -10,16 +10,94 @@ import {
   Alert,
   RefreshControl,
 } from "react-native";
-import { ChevronRight, Calendar } from "lucide-react-native";
+import PropTypes from "prop-types";
+import { Calendar } from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";
 import axios from "axios";
 import authService from "../services/authService";
-import Config from "../config";
 import { Button } from "../components/common";
 import { BottomSheet } from "../components/layouts";
+import { formatDate, formatCurrency } from "../utils";
+import { API_URL } from "../constants/config";
 import { colors, spacing, typography, borderRadius } from "../constants/theme";
 
-const API_URL = Config.API_URL;
+// Transaction type mapping
+const TRANSACTION_TYPE_MAP = {
+  Enrolment: "Class Enrolment",
+  Pass: "Class Pass",
+  Order: "Products Order",
+  Admission: "Workshop Admission",
+};
+
+// Payment Item Component (memoized)
+const PaymentItem = React.memo(({ item, onPress }) => (
+  <TouchableOpacity style={styles.paymentCard}>
+    <View style={styles.cardContent}>
+      <View style={styles.cardLeft}>
+        <Text style={styles.paymentTitle}>{item.title}</Text>
+        <View style={styles.dateContainer}>
+          <Calendar color={colors.textTertiary} size={14} />
+          <Text style={styles.paymentDate}>Due: {item.date}</Text>
+        </View>
+      </View>
+      <View style={styles.cardRight}>
+        <Text style={styles.paymentAmount}>{item.amount}</Text>
+        <Button
+          variant="outline"
+          onPress={() => onPress(item.id)}
+          style={styles.payButton}
+          textStyle={styles.payButtonText}
+        >
+          Pay Now
+        </Button>
+      </View>
+    </View>
+  </TouchableOpacity>
+));
+
+PaymentItem.propTypes = {
+  item: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    title: PropTypes.string.isRequired,
+    amount: PropTypes.string.isRequired,
+    date: PropTypes.string.isRequired,
+  }).isRequired,
+  onPress: PropTypes.func.isRequired,
+};
+
+// Student Item Component (memoized)
+const StudentItem = React.memo(({ item, onViewStudent }) => (
+  <TouchableOpacity
+    style={styles.studentCard}
+    onPress={() => onViewStudent(item.id)}
+  >
+    <View style={styles.studentAvatar}>
+      <Text style={styles.avatarText}>{item.name.charAt(0)}</Text>
+    </View>
+    <View style={styles.studentInfo}>
+      <Text style={styles.studentName}>{item.name}</Text>
+      <Text style={styles.studentDetails}>
+        {item.gender} • {item.age} years
+      </Text>
+    </View>
+    <TouchableOpacity
+      style={styles.viewButton}
+      onPress={() => onViewStudent(item.id)}
+    >
+      <Text style={styles.viewButtonText}>View</Text>
+    </TouchableOpacity>
+  </TouchableOpacity>
+));
+
+StudentItem.propTypes = {
+  item: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    name: PropTypes.string.isRequired,
+    gender: PropTypes.string.isRequired,
+    age: PropTypes.number.isRequired,
+  }).isRequired,
+  onViewStudent: PropTypes.func.isRequired,
+};
 
 export default function DashboardScreen() {
   const navigation = useNavigation();
@@ -31,233 +109,86 @@ export default function DashboardScreen() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentDetailsLoading, setStudentDetailsLoading] = useState(false);
 
-  useEffect(() => {
-    fetchDashboardData();
+  // Format transaction helper
+  const formatTransaction = useCallback((transaction) => {
+    const title = TRANSACTION_TYPE_MAP[transaction.type] || transaction.type;
 
-    // Set up auto-refresh every minute (60000ms)
-    const intervalId = setInterval(() => {
-      fetchDashboardData(true); // Pass true to indicate background refresh
-    }, 60000);
+    // Get entity name from populated entity object
+    let entityName = "";
+    const typeLower = transaction.type.toLowerCase();
+    if (transaction[typeLower]) {
+      entityName = transaction[typeLower].name || "";
+    }
 
-    // Cleanup interval on component unmount
-    return () => clearInterval(intervalId);
+    const fullTitle = entityName ? `${title} - ${entityName}` : title;
+    const amount = formatCurrency(transaction.amount);
+    const date = formatDate(transaction.created);
+
+    return {
+      id: transaction.id,
+      title: fullTitle,
+      amount,
+      date: date || "No due date",
+      rawTransaction: transaction,
+    };
   }, []);
 
-  const fetchDashboardData = async (isBackgroundRefresh = false) => {
+  const fetchDashboardData = useCallback(async (isBackgroundRefresh = false) => {
     try {
-      // Only show loading spinner if it's not a background refresh or pull-to-refresh
       if (!isBackgroundRefresh && !refreshing) {
         setLoading(true);
       }
 
-      console.log("📊 [DASHBOARD] Starting data fetch...");
-      console.log("📊 [DASHBOARD] API_URL:", API_URL);
-
       const token = await authService.getToken();
-      console.log(
-        "📊 [DASHBOARD] Token retrieved:",
-        token ? `YES (length: ${token.length})` : "NO",
-      );
-
-      if (token) {
-        console.log(
-          "📊 [DASHBOARD] Token preview:",
-          token.substring(0, 30) + "..." + token.substring(token.length - 30),
-        );
-
-        // Check token expiration
-        const isExpired = authService.isTokenExpired(token);
-        console.log("📊 [DASHBOARD] Token expired?", isExpired);
-
-        if (isExpired) {
-          console.warn("📊 [DASHBOARD] Token is expired!");
-          const decoded = authService.getProfile(token);
-          if (decoded?.exp) {
-            const expDate = new Date(decoded.exp * 1000);
-            console.log(
-              "📊 [DASHBOARD] Token expired at:",
-              expDate.toISOString(),
-            );
-            console.log(
-              "📊 [DASHBOARD] Current time:",
-              new Date().toISOString(),
-            );
-          }
-        } else {
-          const decoded = authService.getProfile(token);
-          console.log("📊 [DASHBOARD] Token decoded:", {
-            id: decoded?.id,
-            email: decoded?.email,
-            role: decoded?.role,
-            exp: decoded?.exp,
-            expDate: decoded?.exp
-              ? new Date(decoded.exp * 1000).toISOString()
-              : "N/A",
-          });
-        }
-      }
-
       if (!token) {
         Alert.alert("Error", "Please login again");
         return;
+      }
+
+      // Check token expiration
+      if (authService.isTokenExpired(token)) {
+        console.warn("Token is expired!");
       }
 
       const headers = {
         Authorization: `Bearer ${token}`,
       };
 
-      console.log("📊 [DASHBOARD] Request headers:", {
-        Authorization: `Bearer ${token.substring(0, 30)}...`,
-      });
-
-      const paymentsUrl = `${API_URL}/awaiting-payments?limit=5`;
-      const studentsUrl = `${API_URL}/students`;
-
-      console.log("📊 [DASHBOARD] Payments URL:", paymentsUrl);
-      console.log("📊 [DASHBOARD] Students URL:", studentsUrl);
-
-      // Fetch awaiting payments and students in parallel
       const [paymentsResponse, studentsResponse] = await Promise.all([
-        axios.get(paymentsUrl, { headers }),
-        axios.get(studentsUrl, { headers }),
+        axios.get(`${API_URL}/awaiting-payments?limit=5`, { headers }),
+        axios.get(`${API_URL}/students`, { headers }),
       ]);
 
-      console.log(
-        "📊 [DASHBOARD] Payments Response Status:",
-        paymentsResponse.status,
-      );
-      console.log(
-        "📊 [DASHBOARD] Payments Response Data:",
-        JSON.stringify(paymentsResponse.data, null, 2),
-      );
-      console.log(
-        "📊 [DASHBOARD] Students Response Status:",
-        studentsResponse.status,
-      );
-      console.log(
-        "📊 [DASHBOARD] Students Response Data:",
-        JSON.stringify(studentsResponse.data, null, 2),
-      );
-
-      // Process awaiting payments
+      // Process payments
       if (paymentsResponse.data.success) {
-        const formattedPayments =
-          paymentsResponse.data.payload.transactions.map((transaction) => {
-            // Format transaction title based on type
-            const typeMap = {
-              Enrolment: "Class Enrolment",
-              Pass: "Class Pass",
-              Order: "Products Order",
-              Training: "Private Training",
-              Performance: "Event Performance",
-              Hire: "Hall Hire",
-              Admission: "Workshop Admission",
-            };
-
-            const title = typeMap[transaction.type] || transaction.type;
-
-            // Get entity name from populated entity object
-            let entityName = "";
-            const typeLower = transaction.type.toLowerCase();
-            if (transaction[typeLower]) {
-              entityName = transaction[typeLower].name || "";
-            }
-
-            const fullTitle = entityName ? `${title} - ${entityName}` : title;
-
-            // Convert amount from cents to dollars
-            const amount = `$${(transaction.amount / 100).toFixed(2)}`;
-
-            // Format date - handle both timestamp (seconds) and Date object
-            let date = "No due date";
-            if (transaction.created) {
-              if (typeof transaction.created === "number") {
-                // If it's a timestamp in seconds, convert to milliseconds
-                date = new Date(transaction.created * 1000).toLocaleDateString(
-                  "en-AU",
-                );
-              } else if (
-                transaction.created instanceof Date ||
-                typeof transaction.created === "string"
-              ) {
-                // If it's already a Date object or ISO string
-                date = new Date(transaction.created).toLocaleDateString(
-                  "en-AU",
-                );
-              }
-            }
-
-            return {
-              id: transaction.id,
-              title: fullTitle,
-              amount,
-              date,
-              rawTransaction: transaction,
-            };
-          });
-
+        const formattedPayments = paymentsResponse.data.payload.transactions.map(
+          formatTransaction
+        );
         setAwaitingPayments(formattedPayments);
       } else {
-        console.warn(
-          "Payments API returned unsuccessful:",
-          paymentsResponse.data,
-        );
         setAwaitingPayments([]);
       }
 
       // Process students
       if (studentsResponse.data.success) {
         const formattedStudents = studentsResponse.data.payload.students.map(
-          (student) => {
-            return {
-              id: student.id,
-              name: student.name,
-              age: student.age,
-              gender: student.gender,
-              picture: student.picture,
-            };
-          },
+          (student) => ({
+            id: student.id,
+            name: student.name,
+            age: student.age,
+            gender: student.gender,
+            picture: student.picture,
+          })
         );
-
         setStudents(formattedStudents);
       } else {
-        console.warn(
-          "Students API returned unsuccessful:",
-          studentsResponse.data,
-        );
         setStudents([]);
       }
     } catch (error) {
-      console.error("📊 [DASHBOARD] Fetch Error:", error);
-      console.error("📊 [DASHBOARD] Error details:", {
-        message: error.message,
-        code: error.code,
-        response: error.response
-          ? {
-              status: error.response.status,
-              statusText: error.response.statusText,
-              data: error.response.data,
-              headers: error.response.headers,
-            }
-          : "No response",
-        request: error.request
-          ? {
-              url: error.config?.url,
-              method: error.config?.method,
-              headers: error.config?.headers,
-            }
-          : "No request",
-        config: {
-          url: error.config?.url,
-          method: error.config?.method,
-          baseURL: error.config?.baseURL,
-          headers: error.config?.headers,
-        },
-      });
+      console.error("Dashboard fetch error:", error);
 
-      // Handle 401 Unauthorized (token expired)
+      // Handle 401 Unauthorized
       if (error.response?.status === 401) {
-        console.log("Token expired, redirecting to login...");
         Alert.alert(
           "Session Expired",
           "Your session has expired. Please login again.",
@@ -273,7 +204,7 @@ export default function DashboardScreen() {
               },
             },
           ],
-          { cancelable: false },
+          { cancelable: false }
         );
         return;
       }
@@ -284,156 +215,138 @@ export default function DashboardScreen() {
         "Failed to load dashboard data";
       Alert.alert("Error", errorMessage);
 
-      // Set empty arrays on error
       setAwaitingPayments([]);
       setStudents([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [refreshing, navigation, formatTransaction]);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchDashboardData();
-  };
-
-  const fetchStudentDetails = async (studentId) => {
+  const fetchStudentDetails = useCallback(async (studentId) => {
     try {
       setStudentDetailsLoading(true);
 
-      console.log(
-        "🔍 [STUDENT DETAIL] Fetching student details for ID:",
-        studentId,
-      );
-      console.log("🔍 [STUDENT DETAIL] API_URL:", API_URL);
-
       const token = await authService.getToken();
-      console.log("🔍 [STUDENT DETAIL] Token retrieved:", token ? "YES" : "NO");
-
       if (!token) {
         Alert.alert("Error", "Please login again");
         setShowStudentModal(false);
         return;
       }
 
-      const headers = {
-        Authorization: `Bearer ${token}`,
-      };
+      const response = await axios.get(`${API_URL}/students/${studentId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-      const url = `${API_URL}/students/${studentId}`;
-      console.log("🔍 [STUDENT DETAIL] Request URL:", url);
-
-      const response = await axios.get(url, { headers });
-
-      console.log("🔍 [STUDENT DETAIL] Response status:", response.status);
-      console.log(
-        "🔍 [STUDENT DETAIL] Response data:",
-        JSON.stringify(response.data, null, 2),
-      );
-
-      if (
-        response.data.success &&
-        response.data.payload
-      ) {
-        console.log(
-          "🔍 [STUDENT DETAIL] Student data found:",
-          response.data.payload,
-        );
+      if (response.data.success && response.data.payload) {
         setSelectedStudent(response.data.payload);
       } else {
-        console.error(
-          "🔍 [STUDENT DETAIL] Invalid response structure:",
-          response.data,
-        );
         Alert.alert("Error", "Failed to load student details");
         setShowStudentModal(false);
       }
     } catch (error) {
-      console.error(
-        "🔍 [STUDENT DETAIL] Error fetching student details:",
-        error,
-      );
-      console.error(
-        "🔍 [STUDENT DETAIL] Error response:",
-        error.response?.data,
-      );
-      console.error(
-        "🔍 [STUDENT DETAIL] Error status:",
-        error.response?.status,
-      );
+      console.error("Error fetching student details:", error);
       Alert.alert(
         "Error",
-        error.response?.data?.message || "Failed to load student details",
+        error.response?.data?.message || "Failed to load student details"
       );
       setShowStudentModal(false);
     } finally {
       setStudentDetailsLoading(false);
     }
-  };
+  }, []);
 
-  const handleViewStudent = async (studentId) => {
-    console.log(
-      "👆 [STUDENT DETAIL] View button clicked for student ID:",
-      studentId,
-    );
-    setShowStudentModal(true);
-    setSelectedStudent(null); // Reset previous student data
-    await fetchStudentDetails(studentId);
-  };
+  const handleViewStudent = useCallback(
+    async (studentId) => {
+      setShowStudentModal(true);
+      setSelectedStudent(null);
+      await fetchStudentDetails(studentId);
+    },
+    [fetchStudentDetails]
+  );
 
-  const closeStudentModal = () => {
+  const closeStudentModal = useCallback(() => {
     setShowStudentModal(false);
     setSelectedStudent(null);
-  };
+  }, []);
 
-  const renderPaymentItem = ({ item }) => (
-    <TouchableOpacity style={styles.paymentCard}>
-      <View style={styles.cardContent}>
-        <View style={styles.cardLeft}>
-          <Text style={styles.paymentTitle}>{item.title}</Text>
-          <View style={styles.dateContainer}>
-            <Calendar color={colors.textTertiary} size={14} />
-            <Text style={styles.paymentDate}>Due: {item.date}</Text>
-          </View>
-        </View>
-        <View style={styles.cardRight}>
-          <Text style={styles.paymentAmount}>{item.amount}</Text>
-          <Button
-            variant="outline"
-            onPress={() => {}}
-            style={styles.payButton}
-            textStyle={styles.payButtonText}
-          >
-            Pay Now
-          </Button>
-        </View>
-      </View>
-    </TouchableOpacity>
+  const handlePaymentPress = useCallback(
+    (transactionId) => {
+      navigation.navigate("WebView", {
+        targetRoute: `/transactions/${transactionId}`,
+      });
+    },
+    [navigation]
   );
 
-  const renderStudentItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.studentCard}
-      onPress={() => handleViewStudent(item.id)}
-    >
-      <View style={styles.studentAvatar}>
-        <Text style={styles.avatarText}>{item.name.charAt(0)}</Text>
-      </View>
-      <View style={styles.studentInfo}>
-        <Text style={styles.studentName}>{item.name}</Text>
-        <Text style={styles.studentDetails}>
-          {item.gender} • {item.age} years
-        </Text>
-      </View>
-      <TouchableOpacity
-        style={styles.viewButton}
-        onPress={() => handleViewStudent(item.id)}
-      >
-        <Text style={styles.viewButtonText}>View</Text>
-      </TouchableOpacity>
-    </TouchableOpacity>
+  const handleViewAllTransactions = useCallback(() => {
+    navigation.navigate("WebView", { targetRoute: "/transactions" });
+  }, [navigation]);
+
+  const handleAddStudent = useCallback(() => {
+    navigation.navigate("AddStudent");
+  }, [navigation]);
+
+  const handleEditStudent = useCallback(
+    (studentId) => {
+      closeStudentModal();
+      navigation.navigate("StudentDetail", { studentId });
+    },
+    [closeStudentModal, navigation]
   );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  // Auto-refresh setup
+  useEffect(() => {
+    fetchDashboardData();
+
+    const intervalId = setInterval(() => {
+      fetchDashboardData(true);
+    }, 60000);
+
+    return () => clearInterval(intervalId);
+  }, [fetchDashboardData]);
+
+  // Memoized render functions
+  const renderPaymentItem = useCallback(
+    ({ item }) => <PaymentItem item={item} onPress={handlePaymentPress} />,
+    [handlePaymentPress]
+  );
+
+  const renderStudentItem = useCallback(
+    ({ item }) => <StudentItem item={item} onViewStudent={handleViewStudent} />,
+    [handleViewStudent]
+  );
+
+  const keyExtractorPayment = useCallback((item) => item.id, []);
+  const keyExtractorStudent = useCallback((item) => item.id, []);
+
+  // Memoized student full name
+  const studentFullName = useMemo(() => {
+    if (!selectedStudent) return "";
+    const parts = [
+      selectedStudent.firstName,
+      selectedStudent.middleName,
+      selectedStudent.lastName,
+    ].filter(Boolean);
+    return parts.join(" ");
+  }, [selectedStudent]);
+
+  // Memoized student DOB
+  const studentDOB = useMemo(() => {
+    if (!selectedStudent) return "Not provided";
+    if (selectedStudent.dobISO) {
+      return new Date(selectedStudent.dobISO).toLocaleDateString("en-AU");
+    }
+    if (selectedStudent.dob) {
+      return new Date(selectedStudent.dob * 1000).toLocaleDateString("en-AU");
+    }
+    return "Not provided";
+  }, [selectedStudent]);
 
   if (loading) {
     return (
@@ -448,6 +361,7 @@ export default function DashboardScreen() {
     <View style={styles.container}>
       <ScrollView
         style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -467,7 +381,7 @@ export default function DashboardScreen() {
             <FlatList
               data={awaitingPayments}
               renderItem={renderPaymentItem}
-              keyExtractor={(item) => item.id}
+              keyExtractor={keyExtractorPayment}
               scrollEnabled={false}
             />
           ) : (
@@ -477,7 +391,7 @@ export default function DashboardScreen() {
           )}
           <Button
             variant="outline"
-            onPress={() => navigation.navigate("WebView", { targetRoute: '/transactions' })}
+            onPress={handleViewAllTransactions}
             style={styles.viewTransactionsButton}
           >
             View All Transactions
@@ -493,7 +407,7 @@ export default function DashboardScreen() {
             <FlatList
               data={students}
               renderItem={renderStudentItem}
-              keyExtractor={(item) => item.id}
+              keyExtractor={keyExtractorStudent}
               scrollEnabled={false}
             />
           ) : (
@@ -503,7 +417,7 @@ export default function DashboardScreen() {
           )}
           <Button
             variant="secondary"
-            onPress={() => navigation.navigate("AddStudent")}
+            onPress={handleAddStudent}
             style={styles.addStudentButton}
           >
             Add Student
@@ -520,73 +434,39 @@ export default function DashboardScreen() {
         {studentDetailsLoading ? (
           <View style={styles.bottomSheetLoading}>
             <ActivityIndicator size="large" color={colors.secondary} />
-            <Text style={styles.loadingText}>
-              Loading student details...
-            </Text>
+            <Text style={styles.loadingText}>Loading student details...</Text>
           </View>
         ) : !selectedStudent ? (
           <View style={styles.bottomSheetLoading}>
-            <Text style={styles.emptyText}>
-              No student data available
-            </Text>
+            <Text style={styles.emptyText}>No student data available</Text>
           </View>
         ) : (
           <View style={styles.studentDetailsContainer}>
-            {/* Student Name */}
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Full Name</Text>
-              <Text style={styles.detailValue}>
-                {selectedStudent.firstName}{" "}
-                {selectedStudent.middleName
-                  ? selectedStudent.middleName + " "
-                  : ""}
-                {selectedStudent.lastName}
-              </Text>
+              <Text style={styles.detailValue}>{studentFullName}</Text>
             </View>
 
-            {/* Date of Birth */}
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Date of Birth</Text>
-              <Text style={styles.detailValue}>
-                {selectedStudent.dobISO || selectedStudent.dob
-                  ? selectedStudent.dobISO
-                    ? new Date(selectedStudent.dobISO).toLocaleDateString(
-                        "en-AU",
-                      )
-                    : new Date(
-                        selectedStudent.dob * 1000,
-                      ).toLocaleDateString("en-AU")
-                  : "Not provided"}
-              </Text>
+              <Text style={styles.detailValue}>{studentDOB}</Text>
             </View>
 
-            {/* Gender */}
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Gender</Text>
-              <Text style={styles.detailValue}>
-                {selectedStudent.gender}
-              </Text>
+              <Text style={styles.detailValue}>{selectedStudent.gender}</Text>
             </View>
 
-            {/* Medical Notes */}
             {selectedStudent.notes && (
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Medical Notes</Text>
-                <Text style={styles.detailValue}>
-                  {selectedStudent.notes}
-                </Text>
+                <Text style={styles.detailValue}>{selectedStudent.notes}</Text>
               </View>
             )}
 
-            {/* Edit Button */}
             <Button
               variant="secondary"
-              onPress={() => {
-                closeStudentModal();
-                navigation.navigate("StudentDetail", {
-                  studentId: selectedStudent.id,
-                });
-              }}
+              onPress={() => handleEditStudent(selectedStudent.id)}
               style={styles.editStudentButton}
             >
               Edit Student
@@ -607,6 +487,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.md,
   },
+  scrollContent: {
+    paddingBottom: 160,
+  },
   section: {
     marginTop: spacing.lg,
     marginBottom: spacing.md,
@@ -622,17 +505,6 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
     color: colors.textPrimary,
   },
-  seeAllButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-  },
-  seeAllText: {
-    fontSize: typography.sizes.sm,
-    color: colors.primary,
-    fontWeight: typography.weights.semibold,
-  },
-  // Payment Card Styles
   paymentCard: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.lg,
@@ -686,7 +558,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs,
     fontWeight: typography.weights.semibold,
   },
-  // Student Card Styles
   studentCard: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.lg,
@@ -737,7 +608,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     fontWeight: typography.weights.semibold,
   },
-  // Loading State
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -749,7 +619,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.md,
     color: colors.textSecondary,
   },
-  // Empty State
   emptyState: {
     paddingVertical: spacing.xxl,
     alignItems: "center",
@@ -764,7 +633,6 @@ const styles = StyleSheet.create({
   viewTransactionsButton: {
     marginTop: spacing.md,
   },
-  // Bottom Sheet Styles
   bottomSheetLoading: {
     paddingVertical: spacing.xxl,
     alignItems: "center",

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,104 +9,116 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import PropTypes from 'prop-types';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import authService from '../services/authService';
-import Button from '../components/common/Button';
-import TextInput from '../components/common/TextInput';
-import BottomSheet from '../components/layouts/BottomSheet';
+import { Button, TextInput } from '../components/common';
+import { BottomSheet } from '../components/layouts';
+import { useForm } from '../hooks';
+import { validateRequired, validateDateOfBirth } from '../utils';
+import { formatDateDisplay, formatDateInput } from '../utils';
 import { colors, spacing, typography, borderRadius } from '../constants/theme';
+import authService from '../services/authService';
 
-export default function AddStudentScreen({ navigation }) {
-  const [formData, setFormData] = useState({
-    firstName: '',
-    middleName: '',
-    lastName: '',
-    dob: '',
-    gender: '',
-    notes: '',
-  });
+const GENDER_OPTIONS = ['Female', 'Male'];
+
+// Validation rules
+const validationRules = {
+  firstName: (value) => validateRequired(value?.trim(), 'First name'),
+  lastName: (value) => validateRequired(value?.trim(), 'Last name'),
+  dob: (value) => validateDateOfBirth(value),
+  gender: (value) => validateRequired(value, 'Gender'),
+};
+
+const AddStudentScreen = ({ navigation }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showGenderSheet, setShowGenderSheet] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [loading, setLoading] = useState(false);
 
-  const handleDateChange = (_event, date) => {
-    if (date) {
-      setSelectedDate(date);
-      // Format date in local timezone to avoid timezone offset issues
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const formattedDate = `${year}-${month}-${day}`;
-      setFormData({ ...formData, dob: formattedDate });
-    }
-  };
+  // Form handling with custom hook
+  const {
+    values,
+    errors,
+    touched,
+    isSubmitting,
+    handleChange,
+    handleBlur,
+    handleSubmit,
+    setFieldValue,
+  } = useForm(
+    {
+      firstName: '',
+      middleName: '',
+      lastName: '',
+      dob: '',
+      gender: '',
+      notes: '',
+    },
+    handleAddStudent,
+    validationRules
+  );
 
-  const formatDateDisplay = (dateStr) => {
-    if (!dateStr) return '';
-    const [year, month, day] = dateStr.split('-');
-    return `${day}/${month}/${year}`;
-  };
+  // Handle date selection
+  const handleDateChange = useCallback(
+    (_event, date) => {
+      if (date) {
+        setSelectedDate(date);
+        const formattedDate = formatDateInput(date);
+        setFieldValue('dob', formattedDate);
+      }
+    },
+    [setFieldValue]
+  );
 
-  const handleGenderSelect = (gender) => {
-    setFormData({ ...formData, gender });
-    setShowGenderSheet(false);
-  };
+  // Handle gender selection
+  const handleGenderSelect = useCallback(
+    (gender) => {
+      setFieldValue('gender', gender);
+      setShowGenderSheet(false);
+    },
+    [setFieldValue]
+  );
 
-  const handleAddStudent = async () => {
-    // Validate required fields
-    if (!formData.firstName.trim()) {
-      Alert.alert('Error', 'First name is required');
-      return;
-    }
-
-    if (!formData.lastName.trim()) {
-      Alert.alert('Error', 'Last name is required');
-      return;
-    }
-
-    if (!formData.dob) {
-      Alert.alert('Error', 'Date of birth is required');
-      return;
-    }
-
-    if (!formData.gender) {
-      Alert.alert('Error', 'Please select a gender');
-      return;
-    }
-
-    setLoading(true);
+  // Submit handler
+  async function handleAddStudent(formValues) {
     try {
       await authService.addStudent({
-        firstName: formData.firstName.trim(),
-        middleName: formData.middleName.trim(),
-        lastName: formData.lastName.trim(),
-        dob: formData.dob,
-        gender: formData.gender,
-        notes: formData.notes.trim(),
+        firstName: formValues.firstName.trim(),
+        middleName: formValues.middleName.trim(),
+        lastName: formValues.lastName.trim(),
+        dob: formValues.dob,
+        gender: formValues.gender,
+        notes: formValues.notes.trim(),
       });
 
-      Alert.alert(
-        'Success',
-        'Student added successfully',
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.goBack(),
-          },
-        ]
-      );
+      Alert.alert('Success', 'Student added successfully', [
+        {
+          text: 'OK',
+          onPress: () => navigation.goBack(),
+        },
+      ]);
     } catch (error) {
       console.error('Error adding student:', error);
       Alert.alert('Error', error || 'Failed to add student');
-    } finally {
-      setLoading(false);
+      throw error; // Re-throw to let useForm handle the submission state
     }
-  };
+  }
 
-  const handleCancel = () => {
+  // Handle cancel
+  const handleCancel = useCallback(() => {
     navigation.goBack();
-  };
+  }, [navigation]);
+
+  // Close date picker
+  const closeDatePicker = useCallback(() => {
+    if (values.dob) {
+      setShowDatePicker(false);
+    }
+  }, [values.dob]);
+
+  // Memoized display value for date
+  const dateDisplayValue = useMemo(() => {
+    return values.dob ? formatDateDisplay(values.dob) : 'Select date';
+  }, [values.dob]);
 
   return (
     <KeyboardAvoidingView
@@ -118,55 +130,70 @@ export default function AddStudentScreen({ navigation }) {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.content}>
-          {/* Form */}
           <View style={styles.form}>
             {/* First Name */}
             <TextInput
               label="First Name *"
               placeholder="John"
-              value={formData.firstName}
-              onChangeText={(text) => setFormData({ ...formData, firstName: text })}
-              editable={!loading}
+              value={values.firstName}
+              onChangeText={(text) => handleChange('firstName', text)}
+              onBlur={() => handleBlur('firstName')}
+              error={touched.firstName && errors.firstName}
+              editable={!isSubmitting}
             />
 
             {/* Middle Name */}
             <TextInput
               label="Middle Name"
               placeholder="Fred"
-              value={formData.middleName}
-              onChangeText={(text) => setFormData({ ...formData, middleName: text })}
-              editable={!loading}
+              value={values.middleName}
+              onChangeText={(text) => handleChange('middleName', text)}
+              onBlur={() => handleBlur('middleName')}
+              editable={!isSubmitting}
             />
 
             {/* Last Name */}
             <TextInput
               label="Last Name *"
               placeholder="Doe"
-              value={formData.lastName}
-              onChangeText={(text) => setFormData({ ...formData, lastName: text })}
-              editable={!loading}
+              value={values.lastName}
+              onChangeText={(text) => handleChange('lastName', text)}
+              onBlur={() => handleBlur('lastName')}
+              error={touched.lastName && errors.lastName}
+              editable={!isSubmitting}
             />
 
             {/* Date of Birth */}
             <View style={styles.inputWrapper}>
               <Text style={styles.label}>Date of Birth *</Text>
               <TouchableOpacity
-                style={styles.input}
+                style={[
+                  styles.input,
+                  touched.dob && errors.dob && styles.inputError,
+                ]}
                 onPress={() => setShowDatePicker(true)}
-                disabled={loading}
+                disabled={isSubmitting}
               >
                 <View style={styles.dropdownContent}>
-                  <Text style={[styles.dateText, !formData.dob && styles.placeholderText]}>
-                    {formData.dob ? formatDateDisplay(formData.dob) : 'Select date'}
+                  <Text
+                    style={[
+                      styles.dateText,
+                      !values.dob && styles.placeholderText,
+                    ]}
+                  >
+                    {dateDisplayValue}
                   </Text>
                   <Text style={styles.dropdownIcon}>▼</Text>
                 </View>
               </TouchableOpacity>
+              {touched.dob && errors.dob && (
+                <Text style={styles.errorText}>{errors.dob}</Text>
+              )}
             </View>
 
             {/* Date Picker Bottom Sheet */}
             <BottomSheet
-              isVisible={showDatePicker}
+              visible={showDatePicker}
               onClose={() => setShowDatePicker(false)}
               title="Select Date of Birth"
             >
@@ -181,60 +208,59 @@ export default function AddStudentScreen({ navigation }) {
                 />
               </View>
 
-              <Button
-                title="Done"
-                onPress={() => {
-                  if (formData.dob) {
-                    setShowDatePicker(false);
-                  }
-                }}
-              />
+              <Button title="Done" onPress={closeDatePicker} />
             </BottomSheet>
 
             {/* Gender */}
             <View style={styles.inputWrapper}>
               <Text style={styles.label}>Gender *</Text>
               <TouchableOpacity
-                style={styles.input}
+                style={[
+                  styles.input,
+                  touched.gender && errors.gender && styles.inputError,
+                ]}
                 onPress={() => setShowGenderSheet(true)}
-                disabled={loading}
+                disabled={isSubmitting}
               >
                 <View style={styles.dropdownContent}>
-                  <Text style={[styles.dateText, !formData.gender && styles.placeholderText]}>
-                    {formData.gender || 'Select gender'}
+                  <Text
+                    style={[
+                      styles.dateText,
+                      !values.gender && styles.placeholderText,
+                    ]}
+                  >
+                    {values.gender || 'Select gender'}
                   </Text>
                   <Text style={styles.dropdownIcon}>▼</Text>
                 </View>
               </TouchableOpacity>
+              {touched.gender && errors.gender && (
+                <Text style={styles.errorText}>{errors.gender}</Text>
+              )}
             </View>
 
             {/* Gender Bottom Sheet */}
             <BottomSheet
-              isVisible={showGenderSheet}
+              visible={showGenderSheet}
               onClose={() => setShowGenderSheet(false)}
               title="Select Gender"
             >
-              <TouchableOpacity
-                style={styles.bottomSheetOption}
-                onPress={() => handleGenderSelect('Female')}
-              >
-                <Text style={styles.bottomSheetOptionText}>Female</Text>
-                {formData.gender === 'Female' && (
-                  <Text style={styles.checkmark}>✓</Text>
-                )}
-              </TouchableOpacity>
-
-              <View style={styles.bottomSheetDivider} />
-
-              <TouchableOpacity
-                style={styles.bottomSheetOption}
-                onPress={() => handleGenderSelect('Male')}
-              >
-                <Text style={styles.bottomSheetOptionText}>Male</Text>
-                {formData.gender === 'Male' && (
-                  <Text style={styles.checkmark}>✓</Text>
-                )}
-              </TouchableOpacity>
+              {GENDER_OPTIONS.map((gender, index) => (
+                <React.Fragment key={gender}>
+                  <TouchableOpacity
+                    style={styles.bottomSheetOption}
+                    onPress={() => handleGenderSelect(gender)}
+                  >
+                    <Text style={styles.bottomSheetOptionText}>{gender}</Text>
+                    {values.gender === gender && (
+                      <Text style={styles.checkmark}>✓</Text>
+                    )}
+                  </TouchableOpacity>
+                  {index < GENDER_OPTIONS.length - 1 && (
+                    <View style={styles.bottomSheetDivider} />
+                  )}
+                </React.Fragment>
+              ))}
 
               <Button
                 title="Cancel"
@@ -247,26 +273,36 @@ export default function AddStudentScreen({ navigation }) {
             <TextInput
               label="Allergies or Medical Conditions"
               placeholder="Allergies, conditions, etc."
-              value={formData.notes}
-              onChangeText={(text) => setFormData({ ...formData, notes: text })}
+              value={values.notes}
+              onChangeText={(text) => handleChange('notes', text)}
+              onBlur={() => handleBlur('notes')}
               multiline
               numberOfLines={4}
-              editable={!loading}
+              editable={!isSubmitting}
             />
 
             {/* Add Student Button */}
             <Button
               title="Add Student"
-              onPress={handleAddStudent}
-              disabled={loading}
-              loading={loading}
+              onPress={handleSubmit}
+              disabled={isSubmitting}
+              loading={isSubmitting}
             />
+
+            {/* Spacer */}
+            <View style={{ height: 120 }} />
           </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
-}
+};
+
+AddStudentScreen.propTypes = {
+  navigation: PropTypes.shape({
+    goBack: PropTypes.func.isRequired,
+  }).isRequired,
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -304,6 +340,9 @@ const styles = StyleSheet.create({
     padding: spacing.md - 4,
     fontSize: typography.sizes.md,
     color: colors.textPrimary,
+  },
+  inputError: {
+    borderColor: colors.error,
   },
   dateText: {
     fontSize: typography.sizes.md,
@@ -348,4 +387,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.divider,
     marginHorizontal: spacing.lg - 4,
   },
+  errorText: {
+    fontSize: typography.sizes.xs,
+    color: colors.error,
+    marginTop: spacing.xs,
+  },
 });
+
+export default AddStudentScreen;

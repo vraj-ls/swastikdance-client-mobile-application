@@ -1,9 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from 'jwt-decode';
-import Config from '../config';
-
-const API_URL = Config.API_URL;
+import { API_URL } from '../constants/config';
 
 // Storage keys
 const TOKEN_KEY = 'auth_token';

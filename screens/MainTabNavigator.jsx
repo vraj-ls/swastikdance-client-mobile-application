@@ -11,11 +11,7 @@ import {
   X,
   Ticket,
   FileText,
-  UserPlus,
-  Dumbbell,
   BookOpen,
-  Music,
-  Key,
   GraduationCap,
 } from "lucide-react-native";
 import DashboardScreen from "./DashboardScreen";
@@ -57,17 +53,13 @@ const FloatingActionButton = () => {
 
   // Position FAB above the tab bar with proper spacing
   const TAB_BAR_HEIGHT = Platform.OS === 'ios' ? 49 : 56;
-  const fabBottom = TAB_BAR_HEIGHT + insets.bottom + 16;
+  const fabBottom = TAB_BAR_HEIGHT + insets.bottom + 32;
 
   const menuItems = [
     { id: 1, label: "Pass", icon: "ticket", route: "/pass" },
     { id: 2, label: "Enrolment", icon: "fileText", route: "/enrolment" },
-    { id: 3, label: "Training", icon: "dumbbell", route: "/training" },
     { id: 4, label: "Products", icon: "bookOpen", route: "/order" },
-    { id: 5, label: "Performance", icon: "music", route: "/performance" },
-    { id: 6, label: "Hall Hire", icon: "key", route: "/hire" },
     { id: 7, label: "Workshop", icon: "graduationCap", route: "/admission" },
-    { id: 8, label: "Debug", icon: "dumbbell", route: "/debug" },
   ];
 
   const getMenuIcon = (iconName) => {
@@ -77,16 +69,8 @@ const FloatingActionButton = () => {
         return <Ticket {...iconProps} />;
       case "fileText":
         return <FileText {...iconProps} />;
-      case "userPlus":
-        return <UserPlus {...iconProps} />;
-      case "dumbbell":
-        return <Dumbbell {...iconProps} />;
       case "bookOpen":
         return <BookOpen {...iconProps} />;
-      case "music":
-        return <Music {...iconProps} />;
-      case "key":
-        return <Key {...iconProps} />;
       case "graduationCap":
         return <GraduationCap {...iconProps} />;
       default:

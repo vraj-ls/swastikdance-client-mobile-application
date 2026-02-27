@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import PropTypes from 'prop-types';
 import { colors, spacing, borderRadius, typography } from '../../constants/theme';
 
-export const BottomSheet = ({
+const BottomSheetComponent = ({
   visible,
   onClose,
   title,
@@ -75,3 +76,12 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
 });
+
+BottomSheetComponent.propTypes = {
+  visible: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  title: PropTypes.string,
+  children: PropTypes.node,
+};
+
+export const BottomSheet = memo(BottomSheetComponent);

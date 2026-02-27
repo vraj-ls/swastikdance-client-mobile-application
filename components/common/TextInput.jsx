@@ -1,15 +1,18 @@
 import React from 'react';
 import { View, Text, TextInput as RNTextInput, StyleSheet } from 'react-native';
+import PropTypes from 'prop-types';
 import { colors, spacing, borderRadius, typography } from '../../constants/theme';
 
 export const TextInput = ({
   label,
   value,
   onChangeText,
+  onBlur,
   placeholder,
   error,
   editable = true,
   multiline = false,
+  numberOfLines,
   style,
   inputStyle,
   labelStyle,
@@ -31,10 +34,12 @@ export const TextInput = ({
           ]}
           value={value}
           onChangeText={onChangeText}
+          onBlur={onBlur}
           placeholder={placeholder}
           placeholderTextColor={colors.textTertiary}
           editable={editable}
           multiline={multiline}
+          numberOfLines={numberOfLines}
           {...props}
         />
         {rightElement && <View style={styles.rightElement}>{rightElement}</View>}
@@ -91,3 +96,19 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
 });
+
+TextInput.propTypes = {
+  label: PropTypes.string,
+  value: PropTypes.string,
+  onChangeText: PropTypes.func,
+  onBlur: PropTypes.func,
+  placeholder: PropTypes.string,
+  error: PropTypes.string,
+  editable: PropTypes.bool,
+  multiline: PropTypes.bool,
+  numberOfLines: PropTypes.number,
+  style: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
+  inputStyle: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
+  labelStyle: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
+  rightElement: PropTypes.node,
+};

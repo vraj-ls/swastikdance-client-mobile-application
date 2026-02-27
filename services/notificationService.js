@@ -1,11 +1,11 @@
 import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
-import Constants from 'expo-constants';
+import messaging from '@react-native-firebase/messaging';
+import { Platform } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Config from '../config';
+import { API_URL } from '../constants/config';
 
-const API_URL = Config.API_URL;
+export const FCM_CHANNEL_ID = 'swastik-default';
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -16,9 +16,21 @@ Notifications.setNotificationHandler({
   }),
 });
 
+// Create the Android notification channel (must run before any notification is shown)
+if (Platform.OS === 'android') {
+  Notifications.setNotificationChannelAsync(FCM_CHANNEL_ID, {
+    name: 'Swastik Notifications',
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: 'default',
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#E55A28',
+  });
+}
+
 class NotificationService {
   constructor() {
     this.navigationRef = null;
+    this.foregroundFCMListener = null;
     this.notificationListener = null;
     this.responseListener = null;
     this.isInitialized = false;
@@ -56,12 +68,6 @@ class NotificationService {
     try {
       console.log('🔔 [NOTIFICATIONS] Getting token for login...');
 
-      // Check if running on physical device
-      if (!Device.isDevice) {
-        console.log('🔔 [NOTIFICATIONS] Simulator detected, skipping token generation');
-        return null;
-      }
-
       // Request permissions
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
@@ -78,7 +84,9 @@ class NotificationService {
 
       console.log('🔔 [NOTIFICATIONS] Permission granted');
 
-      // Get Expo Push Token
+      // Request Firebase messaging permission (required for iOS; no-op on Android)
+      await messaging().requestPermission();
+
       const token = await this.getFCMToken();
       if (!token) {
         console.log('🔔 [NOTIFICATIONS] Failed to get token');
@@ -93,14 +101,13 @@ class NotificationService {
   }
 
   /**
-   * Get FCM token from Expo
+   * Get FCM registration token directly from Firebase (no Expo push service)
    */
   async getFCMToken() {
     try {
-      // Get Expo Push Token (works with Firebase FCM)
-      const tokenData = await Notifications.getExpoPushTokenAsync();
+      // Get real FCM registration token — works with firebase-admin directly
+      const token = await messaging().getToken();
 
-      const token = tokenData.data;
       console.log('🔔 [NOTIFICATIONS] Token obtained:', token);
 
       // Print FCM token prominently for testing
@@ -123,7 +130,21 @@ class NotificationService {
    * Setup notification listeners for foreground and tap handling
    */
   setupNotificationListeners() {
-    // Listener for notifications received while app is in foreground
+    // Handle FCM messages received while app is in foreground — show as local notification
+    this.foregroundFCMListener = messaging().onMessage(async remoteMessage => {
+      console.log('🔔 [NOTIFICATIONS] FCM foreground message:', remoteMessage);
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: remoteMessage.notification?.title ?? 'Swastik Dance',
+          body: remoteMessage.notification?.body ?? '',
+          data: remoteMessage.data ?? {},
+          sound: 'default',
+        },
+        trigger: null, // show immediately
+      });
+    });
+
+    // Listener for local notifications received while app is in foreground
     this.notificationListener = Notifications.addNotificationReceivedListener(notification => {
       console.log('🔔 [NOTIFICATIONS] Received in foreground:', notification);
     });
@@ -229,6 +250,11 @@ class NotificationService {
     console.log('🔔 [NOTIFICATIONS] Cleaning up listeners...');
 
     try {
+      if (this.foregroundFCMListener) {
+        this.foregroundFCMListener();
+        this.foregroundFCMListener = null;
+      }
+
       if (this.notificationListener) {
         this.notificationListener.remove();
         this.notificationListener = null;

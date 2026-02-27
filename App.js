@@ -3,6 +3,12 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import messaging from "@react-native-firebase/messaging";
+
+// Register background/killed-state FCM handler (must be at module scope, before React tree)
+messaging().setBackgroundMessageHandler(async (remoteMessage) => {
+  console.log("[FCM] Background message received:", remoteMessage);
+});
 
 // Screens
 import LoginScreen from "./screens/LoginScreen";

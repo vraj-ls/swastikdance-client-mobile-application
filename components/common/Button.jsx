@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { TouchableOpacity, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import PropTypes from 'prop-types';
 import { colors, spacing, borderRadius, typography } from '../../constants/theme';
 
-export const Button = ({
+const ButtonComponent = ({
   onPress,
+  title,
   loading = false,
   disabled = false,
   variant = 'primary',
@@ -29,7 +31,7 @@ export const Button = ({
         <ActivityIndicator color={variant === 'primary' ? colors.white : colors.primary} />
       ) : (
         <Text style={[styles.buttonText, styles[`${variant}Text`], textStyle]}>
-          {children}
+          {title || children}
         </Text>
       )}
     </TouchableOpacity>
@@ -45,7 +47,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   primary: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.secondary,
   },
   secondary: {
     backgroundColor: colors.secondary,
@@ -72,3 +74,16 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
 });
+
+ButtonComponent.propTypes = {
+  onPress: PropTypes.func,
+  title: PropTypes.string,
+  loading: PropTypes.bool,
+  disabled: PropTypes.bool,
+  variant: PropTypes.oneOf(['primary', 'secondary', 'outline']),
+  children: PropTypes.node,
+  style: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
+  textStyle: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
+};
+
+export const Button = memo(ButtonComponent);

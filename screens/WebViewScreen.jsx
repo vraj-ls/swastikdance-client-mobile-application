@@ -8,19 +8,14 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import authService from '../services/authService';
-import Config from '../config';
+import { WEB_APP_URL } from '../constants/config';
 import { colors, spacing, typography } from '../constants/theme';
-
-const WEB_APP_URL = Config.WEB_APP_URL;
 
 // Route to title mapping for native app bar
 const ROUTE_TITLES = {
   '/enrolment': 'Class Enrolment',
   '/pass': 'Class Pass',
-  '/training': 'Private Training',
   '/order': 'Products Order',
-  '/performance': 'Event Performance',
-  '/hire': 'Hall Hire',
   '/admission': 'Workshop Admission',
   '/transactions': 'Transactions',
   '': 'Swastik Dance', // Default for empty route
