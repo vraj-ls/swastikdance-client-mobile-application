@@ -2,11 +2,15 @@
  * Application configuration constants
  */
 
+// S3 bucket URL for media assets
+export const S3_BUCKET_URL = "https://swastikdance-app-bucket.s3.ap-southeast-2.amazonaws.com";
+
 // Server URLs
-// export const API_URL = "https://server-swastikdance.asterisk.logicsync.net/mobile";
-// export const WEB_APP_URL = "https://customer-swastikdance.appunder.dev";
-export const WEB_APP_URL = "http://192.168.1.5:3002";
-export const API_URL = "http://192.168.1.5:3001/mobile";
+export const API_URL =
+  "https://server-swastikdance.asterisk.logicsync.net/mobile";
+export const WEB_APP_URL = "https://customer-swastikdance.appunder.dev";
+// export const WEB_APP_URL = "http://192.168.1.11:3002";
+// export const API_URL = "http://192.168.1.11:3001/mobile";
 
 // 192.168.1.5
 // API endpoints
@@ -81,9 +85,9 @@ export const HTTP_STATUS = {
 
 // Storage keys
 export const STORAGE_KEYS = {
-  AUTH_TOKEN: "authToken",
-  USER_PROFILE: "userProfile",
-  FCM_TOKEN: "fcmToken",
+  AUTH_TOKEN: "auth_token",
+  USER_PROFILE: "auth_user",
+  FCM_TOKEN: "fcm_token",
   DEVICE_TOKEN: "deviceToken",
 };
 

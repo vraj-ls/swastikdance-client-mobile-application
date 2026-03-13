@@ -18,8 +18,7 @@ import { validateRequired, validateDateOfBirth } from '../utils';
 import { formatDateDisplay, formatDateInput } from '../utils';
 import { colors, spacing, typography, borderRadius } from '../constants/theme';
 import authService from '../services/authService';
-
-const GENDER_OPTIONS = ['Female', 'Male'];
+import { GENDER_OPTIONS } from '../constants/config';
 
 // Validation rules
 const validationRules = {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  Image,
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
@@ -10,12 +11,13 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import authService from '../services/authService';
-import Button from '../components/common/Button';
-import TextInput from '../components/common/TextInput';
-import BottomSheet from '../components/layouts/BottomSheet';
+import { Button, TextInput } from '../components/common';
+import { BottomSheet } from '../components/layouts';
 import { colors, spacing, typography, borderRadius } from '../constants/theme';
+import { S3_BUCKET_URL } from '../constants/config';
 
 export default function StudentDetailScreen({ route, navigation }) {
   const { studentId } = route.params;
@@ -28,6 +30,8 @@ export default function StudentDetailScreen({ route, navigation }) {
     gender: '',
     notes: '',
   });
+  const [picture, setPicture] = useState(null);
+  const [uploadingPicture, setUploadingPicture] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showGenderSheet, setShowGenderSheet] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -70,6 +74,8 @@ export default function StudentDetailScreen({ route, navigation }) {
       console.log('📱 [MOBILE] Setting formData:', JSON.stringify(formDataToSet, null, 2));
 
       setFormData(formDataToSet);
+      const pic = student.picture;
+      setPicture(pic ? (pic.startsWith('http') ? pic : `${S3_BUCKET_URL}/${pic}`) : null);
     } catch (error) {
       console.error('Error fetching student details:', error);
       Alert.alert('Error', 'Failed to load student details');
@@ -100,6 +106,46 @@ export default function StudentDetailScreen({ route, navigation }) {
   const handleGenderSelect = (gender) => {
     setFormData({ ...formData, gender });
     setShowGenderSheet(false);
+  };
+
+  const handlePickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow access to your photo library to update the profile picture.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (result.canceled) return;
+
+    const asset = result.assets[0];
+    const ext = asset.uri.split('.').pop().toLowerCase();
+    const contentType = ext === 'png' ? 'image/png' : 'image/jpeg';
+    const previousPicture = picture;
+
+    // Show the newly picked image immediately — avoids waiting for upload
+    // and bypasses React Native's image cache (local URI is always fresh)
+    setPicture(asset.uri);
+
+    try {
+      setUploadingPicture(true);
+      const picturePath = await authService.uploadStudentPicture(studentId, asset.uri, contentType);
+      // Append timestamp to bust the S3 cache so the confirmed URL also shows fresh
+      setPicture(`${S3_BUCKET_URL}/${picturePath}?t=${Date.now()}`);
+    } catch (error) {
+      console.error('Error uploading picture:', error);
+      setPicture(previousPicture); // revert on failure
+      const msg = error?.message || String(error) || 'Failed to upload profile picture';
+      Alert.alert('Upload Failed', msg);
+    } finally {
+      setUploadingPicture(false);
+    }
   };
 
   const handleUpdate = async () => {
@@ -133,6 +179,7 @@ export default function StudentDetailScreen({ route, navigation }) {
         dob: formData.dob,
         gender: formData.gender,
         notes: formData.notes.trim(),
+        picture,
       });
 
       Alert.alert(
@@ -147,7 +194,8 @@ export default function StudentDetailScreen({ route, navigation }) {
       );
     } catch (error) {
       console.error('Error updating student:', error);
-      Alert.alert('Error', error || 'Failed to update student');
+      const errorMessage = typeof error === 'string' ? error : (error?.message || 'Failed to update student');
+      Alert.alert('Error', errorMessage);
     } finally {
       setSaving(false);
     }
@@ -172,6 +220,30 @@ export default function StudentDetailScreen({ route, navigation }) {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.content}>
+          {/* Profile Picture */}
+          <TouchableOpacity
+            style={styles.avatarContainer}
+            onPress={handlePickImage}
+            disabled={uploadingPicture || saving}
+          >
+            {picture ? (
+              <Image source={{ uri: picture }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarInitials}>
+                  {(formData.firstName?.[0] ?? '') + (formData.lastName?.[0] ?? '')}
+                </Text>
+              </View>
+            )}
+            <View style={styles.avatarEditBadge}>
+              {uploadingPicture ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <Text style={styles.avatarEditIcon}>✎</Text>
+              )}
+            </View>
+          </TouchableOpacity>
+
           {/* Form */}
           <View style={styles.form}>
             {/* First Name */}
@@ -360,6 +432,49 @@ const styles = StyleSheet.create({
     maxWidth: 500,
     width: '100%',
     alignSelf: 'flex-start',
+  },
+  avatarContainer: {
+    alignSelf: 'center',
+    marginBottom: spacing.xl,
+    position: 'relative',
+  },
+  avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.border,
+  },
+  avatarPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.primary + '22',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitials: {
+    fontSize: typography.sizes.xxl,
+    fontWeight: typography.weights.bold,
+    color: colors.primary,
+    textTransform: 'uppercase',
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.white,
+  },
+  avatarEditIcon: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: typography.weights.bold,
   },
   form: {
     marginBottom: spacing.lg,

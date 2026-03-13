@@ -8,7 +8,6 @@ import {
   ScrollView,
   Platform,
   Alert,
-  Image,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import authService from "../services/authService";
@@ -138,15 +137,6 @@ export default function RegisterScreen({ navigation }) {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.content}>
-          {/* Logo */}
-          <View style={styles.logoContainer}>
-            <Image
-              source={require("../assets/logo.png")}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </View>
-
           {/* Form */}
           <View style={styles.form}>
             <TextInput
@@ -366,16 +356,6 @@ const styles = StyleSheet.create({
     maxWidth: 500,
     width: "100%",
     alignSelf: "flex-start",
-  },
-  logoContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 0,
-    marginBottom: 15,
-  },
-  logo: {
-    width: 250,
-    height: 100,
   },
   header: {
     marginBottom: spacing.xl,

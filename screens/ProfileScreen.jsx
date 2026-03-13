@@ -9,7 +9,7 @@ import {
   Image,
   ActivityIndicator,
 } from 'react-native';
-import { Edit, Lock, Bell, HelpCircle, Info, LogOut, ChevronRight, UserPlus, Wallet } from 'lucide-react-native';
+import { Edit, Lock, Bell, LogOut, ChevronRight, UserPlus, Wallet } from 'lucide-react-native';
 import { Button } from '../components/common/Button';
 import { colors, spacing, typography, borderRadius } from '../constants/theme';
 import authService from '../services/authService';
@@ -171,17 +171,7 @@ export default function ProfileScreen({ navigation }) {
         <ProfileOption
           icon={Bell}
           title="Notification Settings"
-          onPress={() => Alert.alert('Notifications', 'Notification settings coming soon')}
-        />
-        <ProfileOption
-          icon={HelpCircle}
-          title="Help & Support"
-          onPress={() => Alert.alert('Help', 'Help & support coming soon')}
-        />
-        <ProfileOption
-          icon={Info}
-          title="About"
-          onPress={() => Alert.alert('About', 'Swastik Dance App v1.0.0')}
+          onPress={() => navigation.navigate('NotificationSettings')}
         />
       </View>
 
@@ -342,6 +332,7 @@ const styles = StyleSheet.create({
   footer: {
     alignItems: 'center',
     paddingVertical: spacing.lg,
+    paddingBottom: spacing.xxl + 80,
   },
   footerText: {
     fontSize: typography.sizes.xs,

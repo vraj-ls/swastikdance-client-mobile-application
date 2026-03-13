@@ -53,7 +53,7 @@ const FloatingActionButton = () => {
 
   // Position FAB above the tab bar with proper spacing
   const TAB_BAR_HEIGHT = Platform.OS === 'ios' ? 49 : 56;
-  const fabBottom = TAB_BAR_HEIGHT + insets.bottom + 32;
+  const fabBottom = TAB_BAR_HEIGHT + insets.bottom + 12;
 
   const menuItems = [
     { id: 1, label: "Pass", icon: "ticket", route: "/pass" },
@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "#000000",
+    backgroundColor: "#E55A28",
     justifyContent: "center",
     alignItems: "center",
     elevation: 8,

@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -12,13 +13,13 @@ import {
 } from "react-native";
 import PropTypes from "prop-types";
 import { Calendar } from "lucide-react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import axios from "axios";
 import authService from "../services/authService";
 import { Button } from "../components/common";
 import { BottomSheet } from "../components/layouts";
 import { formatDate, formatCurrency } from "../utils";
-import { API_URL } from "../constants/config";
+import { API_URL, S3_BUCKET_URL } from "../constants/config";
 import { colors, spacing, typography, borderRadius } from "../constants/theme";
 
 // Transaction type mapping
@@ -66,14 +67,22 @@ PaymentItem.propTypes = {
 };
 
 // Student Item Component (memoized)
-const StudentItem = React.memo(({ item, onViewStudent }) => (
+const StudentItem = React.memo(({ item, onViewStudent }) => {
+  const pictureUri = item.picture
+    ? (item.picture.startsWith('http') ? item.picture : `${S3_BUCKET_URL}/${item.picture}`)
+    : null;
+  return (
   <TouchableOpacity
     style={styles.studentCard}
     onPress={() => onViewStudent(item.id)}
   >
-    <View style={styles.studentAvatar}>
-      <Text style={styles.avatarText}>{item.name.charAt(0)}</Text>
-    </View>
+    {pictureUri ? (
+      <Image source={{ uri: pictureUri }} style={styles.studentAvatarImage} />
+    ) : (
+      <View style={styles.studentAvatar}>
+        <Text style={styles.avatarText}>{item.name.charAt(0)}</Text>
+      </View>
+    )}
     <View style={styles.studentInfo}>
       <Text style={styles.studentName}>{item.name}</Text>
       <Text style={styles.studentDetails}>
@@ -87,7 +96,8 @@ const StudentItem = React.memo(({ item, onViewStudent }) => (
       <Text style={styles.viewButtonText}>View</Text>
     </TouchableOpacity>
   </TouchableOpacity>
-));
+  );
+});
 
 StudentItem.propTypes = {
   item: PropTypes.shape({
@@ -135,7 +145,7 @@ export default function DashboardScreen() {
 
   const fetchDashboardData = useCallback(async (isBackgroundRefresh = false) => {
     try {
-      if (!isBackgroundRefresh && !refreshing) {
+      if (!isBackgroundRefresh) {
         setLoading(true);
       }
 
@@ -221,7 +231,7 @@ export default function DashboardScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [refreshing, navigation, formatTransaction]);
+  }, [navigation, formatTransaction]);
 
   const fetchStudentDetails = useCallback(async (studentId) => {
     try {
@@ -297,19 +307,22 @@ export default function DashboardScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchDashboardData();
+    await fetchDashboardData(true);
   }, [fetchDashboardData]);
 
-  // Auto-refresh setup
-  useEffect(() => {
-    fetchDashboardData();
+  // Auto-refresh setup — only while screen is focused to avoid background thread
+  // callbacks racing with navigation transitions
+  useFocusEffect(
+    useCallback(() => {
+      fetchDashboardData();
 
-    const intervalId = setInterval(() => {
-      fetchDashboardData(true);
-    }, 60000);
+      const intervalId = setInterval(() => {
+        fetchDashboardData(true);
+      }, 60000);
 
-    return () => clearInterval(intervalId);
-  }, [fetchDashboardData]);
+      return () => clearInterval(intervalId);
+    }, [fetchDashboardData])
+  );
 
   // Memoized render functions
   const renderPaymentItem = useCallback(
@@ -442,6 +455,18 @@ export default function DashboardScreen() {
           </View>
         ) : (
           <View style={styles.studentDetailsContainer}>
+            {/* Student picture */}
+            {selectedStudent.picture ? (
+              <Image
+                source={{ uri: selectedStudent.picture.startsWith('http') ? selectedStudent.picture : `${S3_BUCKET_URL}/${selectedStudent.picture}` }}
+                style={styles.detailAvatar}
+              />
+            ) : (
+              <View style={[styles.detailAvatar, styles.detailAvatarPlaceholder]}>
+                <Text style={styles.detailAvatarText}>{studentFullName.charAt(0)}</Text>
+              </View>
+            )}
+
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Full Name</Text>
               <Text style={styles.detailValue}>{studentFullName}</Text>
@@ -571,11 +596,18 @@ const styles = StyleSheet.create({
   studentAvatar: {
     width: 50,
     height: 50,
-    borderRadius: borderRadius.full,
+    borderRadius: 25,
     backgroundColor: colors.textSecondary,
     justifyContent: "center",
     alignItems: "center",
     marginRight: borderRadius.lg,
+  },
+  studentAvatarImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: borderRadius.lg,
+    backgroundColor: colors.border,
   },
   avatarText: {
     fontSize: typography.sizes.xl,
@@ -639,9 +671,29 @@ const styles = StyleSheet.create({
   },
   studentDetailsContainer: {
     paddingBottom: spacing.lg,
+    alignItems: 'center',
+  },
+  detailAvatar: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    marginBottom: spacing.lg,
+    backgroundColor: colors.border,
+  },
+  detailAvatarPlaceholder: {
+    backgroundColor: colors.primary + '22',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailAvatarText: {
+    fontSize: typography.sizes.xxl,
+    fontWeight: typography.weights.bold,
+    color: colors.primary,
+    textTransform: 'uppercase',
   },
   detailRow: {
     marginBottom: spacing.lg,
+    alignSelf: 'stretch',
   },
   detailLabel: {
     fontSize: typography.sizes.xs,
@@ -658,5 +710,6 @@ const styles = StyleSheet.create({
   },
   editStudentButton: {
     marginTop: spacing.lg,
+    alignSelf: 'stretch',
   },
 });

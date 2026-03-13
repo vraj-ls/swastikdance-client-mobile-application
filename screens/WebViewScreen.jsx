@@ -8,18 +8,9 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import authService from '../services/authService';
-import { WEB_APP_URL } from '../constants/config';
+import { WEB_APP_URL, ROUTE_TITLES } from '../constants/config';
 import { colors, spacing, typography } from '../constants/theme';
 
-// Route to title mapping for native app bar
-const ROUTE_TITLES = {
-  '/enrolment': 'Class Enrolment',
-  '/pass': 'Class Pass',
-  '/order': 'Products Order',
-  '/admission': 'Workshop Admission',
-  '/transactions': 'Transactions',
-  '': 'Swastik Dance', // Default for empty route
-};
 
 export default function WebViewScreen({ navigation, route }) {
   const [token, setToken] = useState(null);
@@ -27,21 +18,26 @@ export default function WebViewScreen({ navigation, route }) {
   const [webViewUrl, setWebViewUrl] = useState(null);
   const webViewRef = useRef(null);
 
-  // Get target route from params (default to empty for enrolment page)
-  const { targetRoute = '' } = route.params || {};
+  // Get target route or external URL from params
+  const { targetRoute = '', externalUrl = null, title: titleParam = null } = route.params || {};
+  const isExternal = !!externalUrl;
 
-  // Set header title based on route
+  // Set header title based on route or explicit title param
   useEffect(() => {
-    const title = ROUTE_TITLES[targetRoute] || 'Swastik Dance';
-    navigation.setOptions({
-      title: title,
-    });
-  }, [targetRoute, navigation]);
+    const title = titleParam || ROUTE_TITLES[targetRoute] || 'Swastik Dance';
+    navigation.setOptions({ title });
+  }, [targetRoute, titleParam, navigation]);
 
   useEffect(() => {
     console.log('=== WebViewScreen MOUNTED ===');
-    console.log('WebViewScreen: Target route:', targetRoute);
-    loadToken();
+    if (isExternal) {
+      console.log('WebViewScreen: External URL:', externalUrl);
+      setWebViewUrl(externalUrl);
+      setLoading(false);
+    } else {
+      console.log('WebViewScreen: Target route:', targetRoute);
+      loadToken();
+    }
   }, []);
 
   const loadToken = async () => {
@@ -84,13 +80,13 @@ export default function WebViewScreen({ navigation, route }) {
     console.log('WebViewScreen: Navigation changed to:', url);
     console.log('WebViewScreen: Page title:', title);
 
-    // Check if user navigated to login page (logout or session expired)
-    if (url && url.includes('/login')) {
+    // Only intercept login redirects for internal web app routes (not external URLs)
+    if (!isExternal && url && url.includes('/login')) {
       console.log('WebViewScreen: Logout detected! User navigated to login page');
       console.log('WebViewScreen: Clearing tokens and navigating to native login...');
 
-      await authService.clearAuth();
-      console.log('WebViewScreen: Tokens cleared successfully');
+      await authService.logout();
+      console.log('WebViewScreen: Auth cleared and FCM token unregistered');
 
       navigation.replace('Login');
     }
@@ -138,17 +134,22 @@ export default function WebViewScreen({ navigation, route }) {
 
   const handleHttpError = (syntheticEvent) => {
     const { nativeEvent } = syntheticEvent;
-    console.error('WebViewScreen: HTTP error:', nativeEvent);
-    console.error('WebViewScreen: Status code:', nativeEvent.statusCode);
-    console.error('WebViewScreen: URL:', nativeEvent.url);
+    console.error('WebViewScreen: HTTP error:', nativeEvent.statusCode, nativeEvent.url);
+    if (nativeEvent.statusCode >= 400) {
+      Alert.alert(
+        'Page Error',
+        `Failed to load page (${nativeEvent.statusCode}). Please try again.`,
+        [{ text: 'OK' }]
+      );
+    }
   };
 
-  if (!webViewUrl || !token) {
+  if (!webViewUrl || (!isExternal && !token)) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>
-          {!token ? 'Loading token...' : 'Loading...'}
+          {!token && !isExternal ? 'Loading token...' : 'Loading...'}
         </Text>
       </View>
     );
@@ -166,12 +167,6 @@ export default function WebViewScreen({ navigation, route }) {
         onHttpError={handleHttpError}
         onNavigationStateChange={handleNavigationStateChange}
         onMessage={handleWebViewMessage}
-        startInLoadingState={true}
-        renderLoading={() => (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        )}
         allowsBackForwardNavigationGestures={true}
         javaScriptEnabled={true}
         domStorageEnabled={true}
@@ -208,12 +203,12 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: spacing.md,
     fontSize: typography.sizes.md,
-    color: colors.border,
+    color: colors.textSecondary,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: colors.secondary,
   },
 });

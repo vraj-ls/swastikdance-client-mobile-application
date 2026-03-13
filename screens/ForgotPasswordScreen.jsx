@@ -7,7 +7,6 @@ import {
   ScrollView,
   Platform,
   Alert,
-  Image,
 } from 'react-native';
 import { Button } from '../components/common/Button';
 import { TextInput } from '../components/common/TextInput';
@@ -59,15 +58,6 @@ export default function ForgotPasswordScreen({ navigation }) {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.content}>
-          {/* Logo */}
-          <View style={styles.logoContainer}>
-            <Image
-              source={require('../assets/logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </View>
-
           {/* Form */}
           <View style={styles.form}>
             <TextInput
@@ -119,16 +109,6 @@ const styles = StyleSheet.create({
     maxWidth: 500,
     width: '100%',
     alignSelf: 'center',
-  },
-  logoContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 0,
-    marginBottom: spacing.xl,
-  },
-  logo: {
-    width: 250,
-    height: 150,
   },
   header: {
     marginBottom: spacing.xl,

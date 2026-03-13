@@ -1,11 +1,11 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from 'jwt-decode';
-import { API_URL } from '../constants/config';
+import { API_URL, STORAGE_KEYS } from '../constants/config';
 
 // Storage keys
-const TOKEN_KEY = 'auth_token';
-const USER_KEY = 'auth_user';
+const TOKEN_KEY = STORAGE_KEYS.AUTH_TOKEN;
+const USER_KEY = STORAGE_KEYS.USER_PROFILE;
 
 class AuthService {
   constructor() {
@@ -227,26 +227,87 @@ class AuthService {
     }
   }
 
-  // Update Student
+  // Upload student picture to S3 and save path via GraphQL (matches admin/client pattern)
+  async uploadStudentPicture(studentId, uri, contentType) {
+    const baseUrl = API_URL.replace('/mobile', '');
+    const picturePath = `pictures/${studentId}.jpg`;
+
+    // 1. Get presigned S3 URL (same collection/filename as admin/client)
+    const urlRes = await axios.get(`${baseUrl}/api/upload/url`, {
+      params: { collection: 'pictures', filename: `${studentId}.jpg`, contentType: 'image/jpeg' },
+      timeout: 15000,
+    });
+    const { url } = urlRes.data;
+
+    // 2. Upload image to S3 via XMLHttpRequest.
+    // Using XHR instead of fetch because React Native's fetch does not set
+    // Content-Length correctly when sending a Blob on iOS physical devices,
+    // causing S3 to receive an empty body.
+    const blob = await fetch(uri).then(r => r.blob());
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', url);
+      xhr.setRequestHeader('Content-Type', 'image/jpeg');
+      xhr.timeout = 30000; // 30 s — prevents the promise hanging forever
+      xhr.onload = function () {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else {
+          reject(new Error(`S3 upload failed: ${xhr.status} ${xhr.responseText}`));
+        }
+      };
+      xhr.onerror   = () => reject(new Error('Network error during S3 upload'));
+      xhr.ontimeout = () => reject(new Error('S3 upload timed out after 30 s'));
+      xhr.send(blob);
+    });
+
+    // 3. Save picture path via GraphQL mutation (works on production server)
+    const token = await AsyncStorage.getItem('auth_token');
+    await axios.post(
+      `${baseUrl}/graphql`,
+      {
+        query: `mutation { updateStudent(input: { id: "${studentId}", picture: "${picturePath}" }) }`,
+      },
+      { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 }
+    );
+
+    return picturePath;
+  }
+
+  // Update Student via GraphQL (same as admin/client pattern)
   async updateStudent(id, studentData) {
     try {
-      const response = await axios.put(`${API_URL}/students/${id}`, {
-        firstName: studentData.firstName,
-        middleName: studentData.middleName || null,
-        lastName: studentData.lastName,
-        dob: studentData.dob,
-        gender: studentData.gender,
-        notes: studentData.notes || null,
-      });
+      const baseUrl = API_URL.replace('/mobile', '');
+      const token = await AsyncStorage.getItem('auth_token');
 
-      if (response.data.success) {
-        return response.data.payload;
-      } else {
-        throw new Error(response.data.message || 'Failed to update student');
+      const input = {
+        id,
+        ...(studentData.firstName !== undefined && { firstName: studentData.firstName }),
+        ...(studentData.middleName !== undefined && { middleName: studentData.middleName }),
+        ...(studentData.lastName !== undefined && { lastName: studentData.lastName }),
+        ...(studentData.dob !== undefined && { dob: studentData.dob }),
+        ...(studentData.gender !== undefined && { gender: studentData.gender }),
+        ...(studentData.notes !== undefined && { notes: studentData.notes }),
+        ...(studentData.picture !== undefined && { picture: studentData.picture }),
+      };
+
+      const response = await axios.post(
+        `${baseUrl}/graphql`,
+        {
+          query: `mutation UpdateStudent($input: studentProfile) { student: updateStudent(input: $input) }`,
+          variables: { input },
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.errors) {
+        throw new Error(response.data.errors[0]?.message || 'Failed to update student');
       }
+
+      return response.data.data?.student;
     } catch (error) {
       console.error('AuthService: Update student error:', error);
-      throw error.response?.data?.message || error.message || 'Failed to update student';
+      throw error.message || 'Failed to update student';
     }
   }
 

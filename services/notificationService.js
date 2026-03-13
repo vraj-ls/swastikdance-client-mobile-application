@@ -1,11 +1,21 @@
 import * as Notifications from 'expo-notifications';
-import messaging from '@react-native-firebase/messaging';
+import {
+  getMessaging,
+  registerDeviceForRemoteMessages,
+  getToken,
+  requestPermission,
+  onNotificationOpenedApp,
+  onTokenRefresh,
+  getInitialNotification,
+} from '@react-native-firebase/messaging';
 import { Platform } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_URL } from '../constants/config';
+import { API_URL, STORAGE_KEYS } from '../constants/config';
 
 export const FCM_CHANNEL_ID = 'swastik-default';
+
+const messagingInstance = getMessaging();
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -80,19 +90,19 @@ class NotificationService {
       if (status !== 'granted') return;
 
       // On iOS, ensure APNs registration is active before asking for the FCM token
-      await messaging().registerDeviceForRemoteMessages();
+      await registerDeviceForRemoteMessages(messagingInstance);
 
-      const currentToken = await messaging().getToken();
+      const currentToken = await getToken(messagingInstance);
       if (!currentToken) return;
 
-      const storedToken = await AsyncStorage.getItem('fcm_token');
+      const storedToken = await AsyncStorage.getItem(STORAGE_KEYS.FCM_TOKEN);
       if (currentToken === storedToken) {
         console.log('🔔 [NOTIFICATIONS] Token unchanged, no re-registration needed');
         return;
       }
 
       // Token is new or has rotated — update local storage and backend
-      await AsyncStorage.setItem('fcm_token', currentToken);
+      await AsyncStorage.setItem(STORAGE_KEYS.FCM_TOKEN, currentToken);
       await axios.put(`${API_URL}/fcm-token`, { token: currentToken }, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
@@ -137,10 +147,10 @@ class NotificationService {
       console.log('🔔 [NOTIFICATIONS] Permission granted');
 
       // Request Firebase messaging permission (required for iOS; no-op on Android)
-      await messaging().requestPermission();
+      await requestPermission(messagingInstance);
 
       // Register with APNs before requesting the FCM token (required on iOS in RNFB v7+)
-      await messaging().registerDeviceForRemoteMessages();
+      await registerDeviceForRemoteMessages(messagingInstance);
 
       const token = await this.getFCMToken();
       if (!token) {
@@ -160,14 +170,14 @@ class NotificationService {
    */
   async getFCMToken() {
     try {
-      const token = await messaging().getToken();
+      const token = await getToken(messagingInstance);
 
       console.log('\n========================================');
       console.log('📱 FCM TOKEN:');
       console.log(token);
       console.log('========================================\n');
 
-      await AsyncStorage.setItem('fcm_token', token);
+      await AsyncStorage.setItem(STORAGE_KEYS.FCM_TOKEN, token);
       return token;
     } catch (error) {
       console.error('🔔 [NOTIFICATIONS] Error getting token:', error);
@@ -191,15 +201,20 @@ class NotificationService {
     });
 
     // User taps a FCM notification while app is in BACKGROUND (not killed)
-    this.backgroundOpenListener = messaging().onNotificationOpenedApp(remoteMessage => {
-      console.log('🔔 [NOTIFICATIONS] App opened from background via FCM tap:', remoteMessage);
+    this.backgroundOpenListener = onNotificationOpenedApp(messagingInstance, remoteMessage => {
+      console.log('🔔 ============================================');
+      console.log('🔔 [FCM] BACKGROUND TAP - User tapped notification');
+      console.log('🔔 [FCM] messageId:', remoteMessage.messageId);
+      console.log('🔔 [FCM] notification:', JSON.stringify(remoteMessage.notification ?? null));
+      console.log('🔔 [FCM] data:', JSON.stringify(remoteMessage.data ?? {}));
+      console.log('🔔 ============================================');
       this.navigateFromData(remoteMessage.data ?? {});
     });
 
     // FCM token refresh — update backend with new token
-    this.tokenRefreshListener = messaging().onTokenRefresh(async (newToken) => {
+    this.tokenRefreshListener = onTokenRefresh(messagingInstance, async (newToken) => {
       console.log('🔔 [NOTIFICATIONS] FCM token refreshed');
-      await AsyncStorage.setItem('fcm_token', newToken);
+      await AsyncStorage.setItem(STORAGE_KEYS.FCM_TOKEN, newToken);
       try {
         const authToken = await AsyncStorage.getItem('auth_token');
         if (authToken) {
@@ -222,10 +237,17 @@ class NotificationService {
    */
   async handleInitialNotification() {
     try {
-      const remoteMessage = await messaging().getInitialNotification();
+      const remoteMessage = await getInitialNotification(messagingInstance);
       if (remoteMessage) {
-        console.log('🔔 [NOTIFICATIONS] App opened from killed state via FCM tap:', remoteMessage);
+        console.log('🔔 ============================================');
+        console.log('🔔 [FCM] KILLED STATE TAP - App launched by tapping notification');
+        console.log('🔔 [FCM] messageId:', remoteMessage.messageId);
+        console.log('🔔 [FCM] notification:', JSON.stringify(remoteMessage.notification ?? null));
+        console.log('🔔 [FCM] data:', JSON.stringify(remoteMessage.data ?? {}));
+        console.log('🔔 ============================================');
         this.navigateFromData(remoteMessage.data ?? {});
+      } else {
+        console.log('🔔 [FCM] KILLED STATE - App launched normally (no notification tap)');
       }
     } catch (error) {
       console.error('🔔 [NOTIFICATIONS] Error handling initial notification:', error);
@@ -270,6 +292,19 @@ class NotificationService {
         this.navigationRef.navigate('Dashboard');
         break;
 
+      case 'ENROLMENT_RECEIPT':
+      case 'ENROLMENT_RENEWAL':
+        this.navigationRef.navigate('WebView', { targetRoute: '/enrolment' });
+        break;
+
+      case 'SESSION_MISSED':
+        this.navigationRef.navigate('Dashboard');
+        break;
+
+      case 'BIRTHDAY':
+        this.navigationRef.navigate('Notifications');
+        break;
+
       case 'GENERAL':
       default:
         this.navigationRef.navigate('Notifications');
@@ -293,7 +328,7 @@ class NotificationService {
         },
       });
 
-      await AsyncStorage.removeItem('fcm_token');
+      await AsyncStorage.removeItem(STORAGE_KEYS.FCM_TOKEN);
       console.log('🔔 [NOTIFICATIONS] Token cleared');
     } catch (error) {
       console.error('🔔 [NOTIFICATIONS] Error clearing token:', error);

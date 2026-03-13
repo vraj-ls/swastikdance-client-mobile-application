@@ -1,43 +1,19 @@
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { Platform, View, ActivityIndicator, StyleSheet } from "react-native";
+import { Platform, View, StyleSheet } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import messaging from "@react-native-firebase/messaging";
+import * as SplashScreen from "expo-splash-screen";
+import { getMessaging, onMessage } from "@react-native-firebase/messaging";
 import * as Notifications from "expo-notifications";
 import InAppNotification from "./components/common/InAppNotification";
-import { FCM_CHANNEL_ID } from "./services/notificationService";
+import SplashOverlay from "./components/common/SplashOverlay";
 
-// Register background/killed-state FCM handler (must be at module scope, before React tree)
-messaging().setBackgroundMessageHandler(async (remoteMessage) => {
-  console.log("[FCM] Background message received:", remoteMessage);
-  // For data-only messages (no notification payload), the OS won't show anything
-  // automatically, so we schedule a local notification manually.
-  if (!remoteMessage.notification) {
-    // Ensure the Android channel exists in the headless task context
-    if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync(FCM_CHANNEL_ID, {
-        name: "Swastik Notifications",
-        importance: Notifications.AndroidImportance.HIGH,
-        sound: "default",
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: "#E55A28",
-      });
-    }
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: remoteMessage.data?.title ?? "Swastik Dance",
-        body: remoteMessage.data?.body ?? "",
-        data: remoteMessage.data ?? {},
-        sound: "default",
-        // channelId routes the notification to the correct Android channel
-        ...(Platform.OS === "android" && { channelId: FCM_CHANNEL_ID }),
-      },
-      trigger: null,
-    });
-  }
-});
+// Keep the native splash visible until we explicitly hide it
+SplashScreen.preventAutoHideAsync();
+
+const messagingInstance = getMessaging();
 
 // Screens
 import LoginScreen from "./screens/LoginScreen";
@@ -49,15 +25,47 @@ import AddStudentScreen from "./screens/AddStudentScreen";
 import StudentDetailScreen from "./screens/StudentDetailScreen";
 import WebViewScreen from "./screens/WebViewScreen";
 import MainTabNavigator from "./screens/MainTabNavigator";
+import NotificationSettingsScreen from "./screens/NotificationSettingsScreen";
+import NotificationDetailScreen from "./screens/NotificationDetailScreen";
 
 // Services
 import authService from "./services/authService";
-import notificationService from "./services/notificationService";
+import notificationService, { FCM_CHANNEL_ID } from "./services/notificationService";
 
 const Stack = createNativeStackNavigator();
 
+const linking = {
+  prefixes: [
+    'swastikdance://',
+    'com.swastikdance.app://',
+    'https://app.swastikdance.com.au',
+    'https://customer-swastikdance.appunder.dev',
+  ],
+  config: {
+    screens: {
+      Main: {
+        screens: {
+          Dashboard:    'dashboard',
+          Notification: 'notifications',
+          Profile:      'profile',
+        },
+      },
+      StudentDetail:        'student/:studentId',
+      WebView: {
+        path: 'view/:targetRoute',
+        parse: { targetRoute: (v) => '/' + v },
+      },
+      EditProfile:          'edit-profile',
+      ChangePassword:       'change-password',
+      NotificationSettings: 'notification-settings',
+      NotificationDetail:   'notification/:id',
+    },
+  },
+};
+
 export default function App() {
-  const [isLoading, setIsLoading] = useState(true);
+  const [appReady, setAppReady] = useState(false);
+  const [splashDone, setSplashDone] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [foregroundNotification, setForegroundNotification] = useState(null);
   const navigationRef = useRef(null);
@@ -65,15 +73,37 @@ export default function App() {
   useEffect(() => {
     console.log("=== App.js MOUNTED ===");
     notificationService.initialize();
-    checkAuthStatus();
+    initApp();
 
     // Show in-app banner for foreground FCM messages
-    const unsubscribe = messaging().onMessage(async remoteMessage => {
-      setForegroundNotification({
-        title: remoteMessage.notification?.title ?? remoteMessage.data?.title ?? "Swastik Dance",
-        body: remoteMessage.notification?.body ?? remoteMessage.data?.body ?? "",
-        data: remoteMessage.data ?? {},
-      });
+    const unsubscribe = onMessage(messagingInstance, async remoteMessage => {
+      console.log('🔔 ============================================');
+      console.log('🔔 [FCM] FOREGROUND - Message received');
+      console.log('🔔 [FCM] messageId:', remoteMessage.messageId);
+      console.log('🔔 [FCM] notification payload:', JSON.stringify(remoteMessage.notification ?? null));
+      console.log('🔔 [FCM] data payload:', JSON.stringify(remoteMessage.data ?? {}));
+      console.log('🔔 ============================================');
+      const title = remoteMessage.notification?.title ?? remoteMessage.data?.title ?? "Swastik Dance";
+      const body  = remoteMessage.notification?.body  ?? remoteMessage.data?.body  ?? "";
+
+      console.log('🔔 [FCM] Showing in-app banner — title:', title, '| body:', body);
+      setForegroundNotification({ title, body, data: remoteMessage.data ?? {} });
+
+      try {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title,
+            body,
+            data: remoteMessage.data ?? {},
+            sound: 'default',
+            ...(Platform.OS === 'android' && { channelId: FCM_CHANNEL_ID }),
+          },
+          trigger: null,
+        });
+        console.log('🔔 [FCM] Foreground local notification scheduled (heads-up banner)');
+      } catch (e) {
+        console.warn('🔔 [FCM] Could not schedule local notification:', e.message ?? e);
+      }
     });
 
     return () => {
@@ -82,16 +112,7 @@ export default function App() {
     };
   }, []);
 
-  // Called by NavigationContainer once the navigator is fully mounted and ready.
-  // This is the correct place to set the navigation ref and handle the initial
-  // notification (app opened from killed state by tapping a notification).
-  const handleNavigationReady = useCallback(() => {
-    authService.setNavigationRef(navigationRef.current);
-    notificationService.setNavigationRef(navigationRef.current);
-    notificationService.handleInitialNotification();
-  }, []);
-
-  const checkAuthStatus = async () => {
+  const initApp = async () => {
     try {
       console.log("App.js: Checking auth status...");
       const loggedIn = await authService.isLoggedIn();
@@ -100,100 +121,95 @@ export default function App() {
     } catch (error) {
       console.error("App.js: Error checking auth status:", error);
     } finally {
-      setIsLoading(false);
+      // Mark ready first so React renders the tree (SplashOverlay covers the screen).
+      // hideAsync() is called in onLayout below, after the view is actually painted,
+      // so the native splash never reveals a blank white frame.
+      setAppReady(true);
     }
   };
 
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#E55A28" />
-      </View>
-    );
-  }
+  const handleNavigationReady = useCallback(() => {
+    authService.setNavigationRef(navigationRef.current);
+    notificationService.setNavigationRef(navigationRef.current);
+    notificationService.handleInitialNotification();
+  }, []);
+
+  if (!appReady) return null;
 
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
-      <NavigationContainer ref={navigationRef} onReady={handleNavigationReady}>
 
+      <NavigationContainer ref={navigationRef} linking={linking} onReady={handleNavigationReady}>
         <Stack.Navigator
           initialRouteName={isLoggedIn ? "Main" : "Login"}
           screenOptions={{
-            headerStyle: {
-              backgroundColor: "#000000",
-            },
+            headerStyle: { backgroundColor: "#000000" },
             headerTintColor: "#fff",
-            headerTitleStyle: {
-              fontWeight: "bold",
-            },
+            headerTitleStyle: { fontWeight: "bold" },
+            headerBackTitleVisible: false,
+            headerBackTitle: ' ',
+            headerBackButtonDisplayMode: 'minimal',
           }}
         >
-          {/* All screens available for navigation */}
           <Stack.Screen
             name="Login"
             component={LoginScreen}
-            options={{
-              title: "Swastik Dance",
-              headerShown: false,
-            }}
+            options={{ title: "Swastik Dance", headerShown: false }}
           />
           <Stack.Screen
             name="Register"
             component={RegisterScreen}
-            options={{
-              title: "Create Account",
-            }}
+            options={{ title: "Create Account" }}
           />
           <Stack.Screen
             name="ForgotPassword"
             component={ForgotPasswordScreen}
-            options={{
-              title: "Reset Password",
-            }}
+            options={{ title: "Reset Password" }}
           />
           <Stack.Screen
             name="Main"
             component={MainTabNavigator}
-            options={{ headerShown: false }}
+            options={{ headerShown: false, headerBackTitle: ' ' }}
           />
           <Stack.Screen
             name="EditProfile"
             component={EditProfileScreen}
-            options={{
-              title: "Edit Profile",
-            }}
+            options={{ title: "Edit Profile" }}
           />
           <Stack.Screen
             name="ChangePassword"
             component={ChangePasswordScreen}
-            options={{
-              title: "Change Password",
-            }}
+            options={{ title: "Change Password" }}
           />
           <Stack.Screen
             name="AddStudent"
             component={AddStudentScreen}
-            options={{
-              title: "Add a new student",
-            }}
+            options={{ title: "Add a new student" }}
           />
           <Stack.Screen
             name="StudentDetail"
             component={StudentDetailScreen}
-            options={{
-              title: "Update Student",
-            }}
+            options={{ title: "Update Student" }}
           />
           <Stack.Screen
             name="WebView"
             component={WebViewScreen}
-            options={{
-              title: "Swastik Dance", // Default title, will be updated dynamically
-            }}
+            options={{ title: "Swastik Dance" }}
+          />
+          <Stack.Screen
+            name="NotificationSettings"
+            component={NotificationSettingsScreen}
+            options={{ title: "Notification Settings" }}
+          />
+          <Stack.Screen
+            name="NotificationDetail"
+            component={NotificationDetailScreen}
+            options={{ title: "Notification" }}
           />
         </Stack.Navigator>
       </NavigationContainer>
+
       <InAppNotification
         notification={foregroundNotification}
         onDismiss={() => setForegroundNotification(null)}
@@ -202,15 +218,13 @@ export default function App() {
           notificationService.handleNotificationTap({ request: { content: { data: notification.data } } });
         }}
       />
+
+      {/* Animated JS splash overlay — sits on top until animation completes */}
+      {!splashDone && (
+        <SplashOverlay onFinish={() => setSplashDone(true)} />
+      )}
     </SafeAreaProvider>
   );
 }
 
-const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#E55C2A",
-  },
-});
+const styles = StyleSheet.create({});

@@ -9,25 +9,19 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import {
-  Mail,
-  MessageSquare,
-  Bell,
-  Trash2,
-  Check,
-  X,
-  Inbox as InboxIcon,
-} from 'lucide-react-native';
+import { Bell } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
 import { colors, spacing, typography, borderRadius } from '../constants/theme';
 import authService from '../services/authService';
 import notificationService from '../services/notificationService';
 
 export default function NotificationScreen() {
+  const navigation = useNavigation();
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [filter, setFilter] = useState('all'); // 'all', 'unread', 'email', 'sms'
+  const [filter, setFilter] = useState('all'); // 'all', 'unread', 'email', 'sms', 'push'
 
   // Fetch inbox messages
   const fetchInbox = useCallback(
@@ -69,7 +63,6 @@ export default function NotificationScreen() {
 
   // Initial load
   useEffect(() => {
-    // Clear badge when viewing notifications
     notificationService.clearBadge();
     fetchInbox();
   }, [fetchInbox]);
@@ -89,111 +82,16 @@ export default function NotificationScreen() {
     fetchInbox(false);
   };
 
-  // Mark as read
-  const handleMarkAsRead = async (id) => {
-    try {
-      await authService.markMessageAsRead(id);
+  // Open detail screen — marks as read handled inside detail screen
+  const handleOpenMessage = (item) => {
+    navigation.navigate('NotificationDetail', { message: item });
 
-      // Update local state
-      setMessages((prevMessages) =>
-        prevMessages.map((msg) =>
-          msg._id === id ? { ...msg, read: true } : msg
-        )
+    // Optimistically update local state so list shows as read immediately
+    if (!item.read) {
+      setMessages((prev) =>
+        prev.map((msg) => (msg._id === item._id ? { ...msg, read: true } : msg))
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch (error) {
-      Alert.alert('Error', 'Failed to mark as read');
-    }
-  };
-
-  // Mark as unread
-  const handleMarkAsUnread = async (id) => {
-    try {
-      await authService.markMessageAsUnread(id);
-
-      // Update local state
-      setMessages((prevMessages) =>
-        prevMessages.map((msg) =>
-          msg._id === id ? { ...msg, read: false } : msg
-        )
-      );
-      setUnreadCount((prev) => prev + 1);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to mark as unread');
-    }
-  };
-
-  // Delete message
-  const handleDelete = async (id) => {
-    Alert.alert(
-      'Delete Message',
-      'Are you sure you want to delete this message?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await authService.deleteMessage(id);
-
-              // Remove from local state
-              setMessages((prevMessages) =>
-                prevMessages.filter((msg) => msg._id !== id)
-              );
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete message');
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  // Mark all as read
-  const handleMarkAllAsRead = async () => {
-    try {
-      await authService.markAllMessagesAsRead();
-
-      // Update all messages to read
-      setMessages((prevMessages) =>
-        prevMessages.map((msg) => ({ ...msg, read: true }))
-      );
-      setUnreadCount(0);
-
-      Alert.alert('Success', 'All messages marked as read');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to mark all as read');
-    }
-  };
-
-  // Get icon based on message type
-  const getIcon = (type) => {
-    const iconProps = { color: colors.white, size: 20 };
-    switch (type) {
-      case 'EMAIL':
-        return <Mail {...iconProps} />;
-      case 'SMS':
-        return <MessageSquare {...iconProps} />;
-      case 'PUSH':
-      case 'NOTIFICATION':
-        return <Bell {...iconProps} />;
-      default:
-        return <InboxIcon {...iconProps} />;
-    }
-  };
-
-  const getIconStyle = (type) => {
-    switch (type) {
-      case 'EMAIL':
-        return styles.iconEmail;
-      case 'SMS':
-        return styles.iconSMS;
-      case 'PUSH':
-      case 'NOTIFICATION':
-        return styles.iconPush;
-      default:
-        return styles.iconGeneral;
     }
   };
 
@@ -223,13 +121,9 @@ export default function NotificationScreen() {
   const renderMessageItem = ({ item }) => (
     <TouchableOpacity
       style={[styles.messageCard, !item.read && styles.unreadCard]}
-      onPress={() => !item.read && handleMarkAsRead(item._id)}
+      onPress={() => handleOpenMessage(item)}
       activeOpacity={0.7}
     >
-      <View style={[styles.iconContainer, getIconStyle(item.type)]}>
-        {getIcon(item.type)}
-      </View>
-
       <View style={styles.messageContent}>
         <Text style={styles.messageTitle} numberOfLines={1}>
           {item.title || item.subject}
@@ -240,40 +134,6 @@ export default function NotificationScreen() {
         <Text style={styles.messageTime}>{formatDate(item.createdAt)}</Text>
       </View>
 
-      <View style={styles.actionButtons}>
-        {!item.read ? (
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              handleMarkAsRead(item._id);
-            }}
-          >
-            <Check color={colors.success} size={20} />
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              handleMarkAsUnread(item._id);
-            }}
-          >
-            <X color={colors.textSecondary} size={20} />
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            handleDelete(item._id);
-          }}
-        >
-          <Trash2 color={colors.error} size={18} />
-        </TouchableOpacity>
-      </View>
-
       {!item.read && <View style={styles.unreadDot} />}
     </TouchableOpacity>
   );
@@ -281,67 +141,24 @@ export default function NotificationScreen() {
   // Render filter tabs
   const renderFilterTabs = () => (
     <View style={styles.filterContainer}>
-      <TouchableOpacity
-        style={[styles.filterTab, filter === 'all' && styles.filterTabActive]}
-        onPress={() => setFilter('all')}
-      >
-        <Text
-          style={[
-            styles.filterText,
-            filter === 'all' && styles.filterTextActive,
-          ]}
+      {['all', 'unread'].map((tab) => (
+        <TouchableOpacity
+          key={tab}
+          style={[styles.filterTab, filter === tab && styles.filterTabActive]}
+          onPress={() => setFilter(tab)}
         >
-          All
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[
-          styles.filterTab,
-          filter === 'unread' && styles.filterTabActive,
-        ]}
-        onPress={() => setFilter('unread')}
-      >
-        <Text
-          style={[
-            styles.filterText,
-            filter === 'unread' && styles.filterTextActive,
-          ]}
-        >
-          Unread {unreadCount > 0 && `(${unreadCount})`}
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[
-          styles.filterTab,
-          filter === 'email' && styles.filterTabActive,
-        ]}
-        onPress={() => setFilter('email')}
-      >
-        <Text
-          style={[
-            styles.filterText,
-            filter === 'email' && styles.filterTextActive,
-          ]}
-        >
-          Email
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.filterTab, filter === 'sms' && styles.filterTabActive]}
-        onPress={() => setFilter('sms')}
-      >
-        <Text
-          style={[
-            styles.filterText,
-            filter === 'sms' && styles.filterTextActive,
-          ]}
-        >
-          SMS
-        </Text>
-      </TouchableOpacity>
+          <Text
+            style={[
+              styles.filterText,
+              filter === tab && styles.filterTextActive,
+            ]}
+          >
+            {tab === 'unread' && unreadCount > 0
+              ? `Unread (${unreadCount})`
+              : tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </Text>
+        </TouchableOpacity>
+      ))}
     </View>
   );
 
@@ -369,15 +186,6 @@ export default function NotificationScreen() {
   return (
     <View style={styles.container}>
       {renderFilterTabs()}
-
-      {unreadCount > 0 && (
-        <TouchableOpacity
-          style={styles.markAllButton}
-          onPress={handleMarkAllAsRead}
-        >
-          <Text style={styles.markAllText}>Mark all as read</Text>
-        </TouchableOpacity>
-      )}
 
       <FlatList
         data={messages}
@@ -436,18 +244,6 @@ const styles = StyleSheet.create({
   filterTextActive: {
     color: colors.white,
   },
-  markAllButton: {
-    backgroundColor: colors.white,
-    padding: spacing.md - spacing.xs,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.divider,
-  },
-  markAllText: {
-    fontSize: typography.sizes.sm,
-    color: colors.secondary,
-    fontWeight: typography.weights.semibold,
-    textAlign: 'center',
-  },
   listContainer: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
@@ -469,26 +265,6 @@ const styles = StyleSheet.create({
     borderColor: colors.secondary,
     borderWidth: 1.5,
   },
-  iconContainer: {
-    width: spacing.xxl,
-    height: spacing.xxl,
-    borderRadius: borderRadius.xxl,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md - spacing.xs,
-  },
-  iconEmail: {
-    backgroundColor: colors.secondary,
-  },
-  iconSMS: {
-    backgroundColor: colors.info,
-  },
-  iconPush: {
-    backgroundColor: '#8b5cf6',
-  },
-  iconGeneral: {
-    backgroundColor: colors.textSecondary,
-  },
   messageContent: {
     flex: 1,
   },
@@ -507,22 +283,13 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs,
     color: colors.textSecondary,
   },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginLeft: spacing.sm,
-  },
-  actionButton: {
-    padding: spacing.xs,
-  },
   unreadDot: {
-    position: 'absolute',
-    top: spacing.sm,
-    right: spacing.sm,
     width: spacing.sm,
     height: spacing.sm,
     borderRadius: spacing.xs,
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.primary,
+    marginLeft: spacing.sm,
+    marginTop: spacing.xs,
   },
   emptyContainer: {
     flex: 1,
