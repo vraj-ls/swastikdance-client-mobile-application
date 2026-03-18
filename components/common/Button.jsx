@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   primary: {
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.primary,
   },
   secondary: {
     backgroundColor: colors.secondary,

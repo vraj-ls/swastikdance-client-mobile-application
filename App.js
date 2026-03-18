@@ -8,7 +8,6 @@ import * as SplashScreen from "expo-splash-screen";
 import { getMessaging, onMessage } from "@react-native-firebase/messaging";
 import * as Notifications from "expo-notifications";
 import InAppNotification from "./components/common/InAppNotification";
-import SplashOverlay from "./components/common/SplashOverlay";
 
 // Keep the native splash visible until we explicitly hide it
 SplashScreen.preventAutoHideAsync();
@@ -65,7 +64,6 @@ const linking = {
 
 export default function App() {
   const [appReady, setAppReady] = useState(false);
-  const [splashDone, setSplashDone] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [foregroundNotification, setForegroundNotification] = useState(null);
   const navigationRef = useRef(null);
@@ -121,10 +119,8 @@ export default function App() {
     } catch (error) {
       console.error("App.js: Error checking auth status:", error);
     } finally {
-      // Mark ready first so React renders the tree (SplashOverlay covers the screen).
-      // hideAsync() is called in onLayout below, after the view is actually painted,
-      // so the native splash never reveals a blank white frame.
       setAppReady(true);
+      SplashScreen.hideAsync().catch(() => {});
     }
   };
 
@@ -219,10 +215,7 @@ export default function App() {
         }}
       />
 
-      {/* Animated JS splash overlay — sits on top until animation completes */}
-      {!splashDone && (
-        <SplashOverlay onFinish={() => setSplashDone(true)} />
-      )}
+
     </SafeAreaProvider>
   );
 }

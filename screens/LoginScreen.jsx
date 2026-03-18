@@ -7,7 +7,6 @@ import {
   ScrollView,
   Platform,
   Alert,
-  Image,
 } from 'react-native';
 import authService from '../services/authService';
 import notificationService from '../services/notificationService';
@@ -67,15 +66,6 @@ export default function LoginScreen({ navigation }) {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.content}>
-          {/* Logo */}
-          <View style={styles.logoContainer}>
-            <Image
-              source={require('../assets/logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </View>
-
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Login</Text>
@@ -145,7 +135,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingTop: 60,
+    paddingTop: spacing.xl,
     paddingBottom: spacing.xl,
   },
   content: {
@@ -153,16 +143,6 @@ const styles = StyleSheet.create({
     maxWidth: 500,
     width: '100%',
     alignSelf: 'flex-start',
-  },
-  logoContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.xl,
-    marginBottom: spacing.xl,
-  },
-  logo: {
-    width: 250,
-    height: 150,
   },
   header: {
     marginBottom: spacing.xl,
