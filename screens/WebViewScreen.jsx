@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Text,
   Alert,
+  TouchableOpacity,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import authService from '../services/authService';
@@ -22,10 +23,20 @@ export default function WebViewScreen({ navigation, route }) {
   const { targetRoute = '', externalUrl = null, title: titleParam = null } = route.params || {};
   const isExternal = !!externalUrl;
 
-  // Set header title based on route or explicit title param
+  // Set header title and reload button
   useEffect(() => {
     const title = titleParam || ROUTE_TITLES[targetRoute] || 'Swastik Dance';
-    navigation.setOptions({ title });
+    navigation.setOptions({
+      title,
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => webViewRef.current?.reload()}
+          style={{ marginRight: spacing.sm }}
+        >
+          <Text style={{ color: colors.white, fontSize: 22 }}>↺</Text>
+        </TouchableOpacity>
+      ),
+    });
   }, [targetRoute, titleParam, navigation]);
 
   useEffect(() => {

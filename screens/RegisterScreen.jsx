@@ -244,9 +244,7 @@ export default function RegisterScreen({ navigation }) {
                       ? "Male"
                       : formData.gender === "FEMALE"
                         ? "Female"
-                        : formData.gender === "OTHER"
-                          ? "Other"
-                          : "Select gender"}
+                        : "Select gender"}
                   </Text>
                   <Text style={styles.dropdownIcon}>▼</Text>
                 </View>
@@ -277,18 +275,6 @@ export default function RegisterScreen({ navigation }) {
               >
                 <Text style={styles.bottomSheetOptionText}>Female</Text>
                 {formData.gender === "FEMALE" && (
-                  <Text style={styles.checkmark}>✓</Text>
-                )}
-              </TouchableOpacity>
-
-              <View style={styles.bottomSheetDivider} />
-
-              <TouchableOpacity
-                style={styles.bottomSheetOption}
-                onPress={() => handleGenderSelect("OTHER")}
-              >
-                <Text style={styles.bottomSheetOptionText}>Other</Text>
-                {formData.gender === "OTHER" && (
                   <Text style={styles.checkmark}>✓</Text>
                 )}
               </TouchableOpacity>
@@ -355,7 +341,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     maxWidth: 500,
     width: "100%",
-    alignSelf: "flex-start",
+    alignSelf: Platform.select({ web: "flex-start", default: "center" }),
   },
   header: {
     marginBottom: spacing.xl,

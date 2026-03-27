@@ -80,15 +80,6 @@ export default function ForgotPasswordScreen({ navigation }) {
             </Button>
           </View>
 
-          {/* Back to Login */}
-          <View style={styles.footer}>
-            <Text
-              style={styles.link}
-              onPress={() => navigation.navigate('Login')}
-            >
-              Back to Login
-            </Text>
-          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -102,7 +93,8 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingTop: 60,
+    paddingTop: Platform.select({ web: 60, default: spacing.xl }),
+    paddingBottom: spacing.xxl,
   },
   content: {
     padding: spacing.lg,

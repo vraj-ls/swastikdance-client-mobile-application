@@ -172,11 +172,6 @@ class NotificationService {
     try {
       const token = await getToken(messagingInstance);
 
-      console.log('\n========================================');
-      console.log('📱 FCM TOKEN:');
-      console.log(token);
-      console.log('========================================\n');
-
       await AsyncStorage.setItem(STORAGE_KEYS.FCM_TOKEN, token);
       return token;
     } catch (error) {

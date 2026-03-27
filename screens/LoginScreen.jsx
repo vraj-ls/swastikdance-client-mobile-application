@@ -107,6 +107,7 @@ export default function LoginScreen({ navigation }) {
               onPress={handleLogin}
               loading={loading}
               disabled={loading}
+              variant="primary"
               style={styles.button}
             >
               LOGIN
@@ -135,14 +136,14 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xl,
+    justifyContent: 'center',
+    paddingVertical: spacing.xl,
   },
   content: {
     padding: spacing.lg,
     maxWidth: 500,
     width: '100%',
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
   },
   header: {
     marginBottom: spacing.xl,
