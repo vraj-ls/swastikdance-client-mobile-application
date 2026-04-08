@@ -60,6 +60,7 @@ const FloatingActionButton = () => {
     { id: 2, label: "Enrolment", icon: "fileText", route: "/enrolment" },
     { id: 4, label: "Products", icon: "bookOpen", route: "/order" },
     { id: 7, label: "Workshop", icon: "graduationCap", route: "/admission" },
+    { id: 5, label: "Courses", icon: "bookOpen", route: "/courses" },
   ];
 
   const getMenuIcon = (iconName) => {
