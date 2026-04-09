@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import authService from "../services/authService";
+import notificationService from "../services/notificationService";
 import { Button } from "../components/common/Button";
 import { TextInput } from "../components/common/TextInput";
 import { BottomSheet } from "../components/layouts/BottomSheet";
@@ -99,6 +100,9 @@ export default function RegisterScreen({ navigation }) {
       console.log("Full Response:", JSON.stringify(response, null, 2));
 
       // Show password to user
+      // Register FCM token now that auth is stored
+      notificationService.checkAndRegisterToken().catch(() => {});
+
       if (response.payload.password) {
         console.log("Registration successful, showing password to user");
         Alert.alert(
