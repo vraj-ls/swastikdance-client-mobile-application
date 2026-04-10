@@ -64,6 +64,7 @@ export const ROUTE_TITLES = {
   "/pass": "Class Pass",
   "/order": "Products Order",
   "/admission": "Workshop Admission",
+  "/courses": "Course Registration",
   "/transactions": "Transactions",
   "": "Swastik Dance",
 };
