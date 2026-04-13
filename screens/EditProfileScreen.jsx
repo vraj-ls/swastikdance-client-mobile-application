@@ -186,6 +186,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingTop: spacing.lg,
+    paddingBottom: spacing.xl + 50, // Extra space at bottom for better button visibility
   },
   content: {
     padding: spacing.lg,

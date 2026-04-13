@@ -193,6 +193,7 @@ class AuthService {
         dob: studentData.dob,
         gender: studentData.gender,
         notes: studentData.notes || null,
+        emergencyContact: studentData.emergencyContact || null,
       });
 
       if (response.data.success) {

@@ -51,6 +51,9 @@ const AddStudentScreen = ({ navigation }) => {
       dob: '',
       gender: '',
       notes: '',
+      emergencyName: '',
+      emergencyRelation: '',
+      emergencyPhone: '',
     },
     handleAddStudent,
     validationRules
@@ -87,6 +90,11 @@ const AddStudentScreen = ({ navigation }) => {
         dob: formValues.dob,
         gender: formValues.gender,
         notes: formValues.notes.trim(),
+        emergencyContact: {
+          name: formValues.emergencyName.trim() || null,
+          relation: formValues.emergencyRelation.trim() || null,
+          phone: formValues.emergencyPhone.trim() || null,
+        },
       });
 
       Alert.alert('Success', 'Student added successfully', [
@@ -280,6 +288,34 @@ const AddStudentScreen = ({ navigation }) => {
               editable={!isSubmitting}
             />
 
+            {/* Emergency Contact */}
+            <Text style={styles.sectionTitle}>Emergency Contact</Text>
+            <TextInput
+              label="Name"
+              placeholder="Jane Doe"
+              value={values.emergencyName}
+              onChangeText={(text) => handleChange('emergencyName', text)}
+              onBlur={() => handleBlur('emergencyName')}
+              editable={!isSubmitting}
+            />
+            <TextInput
+              label="Relation"
+              placeholder="Parent, Guardian, etc."
+              value={values.emergencyRelation}
+              onChangeText={(text) => handleChange('emergencyRelation', text)}
+              onBlur={() => handleBlur('emergencyRelation')}
+              editable={!isSubmitting}
+            />
+            <TextInput
+              label="Phone"
+              placeholder="0400 000 000"
+              value={values.emergencyPhone}
+              onChangeText={(text) => handleChange('emergencyPhone', text)}
+              onBlur={() => handleBlur('emergencyPhone')}
+              keyboardType="phone-pad"
+              editable={!isSubmitting}
+            />
+
             {/* Add Student Button */}
             <Button
               title="Add Student"
@@ -390,6 +426,13 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs,
     color: colors.error,
     marginTop: spacing.xs,
+  },
+  sectionTitle: {
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold,
+    color: colors.textPrimary,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
   },
 });
 
