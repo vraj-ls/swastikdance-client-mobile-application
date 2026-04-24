@@ -9,7 +9,7 @@ import {
   Image,
   ActivityIndicator,
 } from 'react-native';
-import { Edit, Lock, Bell, LogOut, ChevronRight, UserPlus, Wallet } from 'lucide-react-native';
+import { Edit, Lock, Bell, LogOut, ChevronRight, UserPlus, Wallet, Trash2 } from 'lucide-react-native';
 import { Button } from '../components/common/Button';
 import { colors, spacing, typography, borderRadius } from '../constants/theme';
 import authService from '../services/authService';
@@ -18,9 +18,13 @@ export default function ProfileScreen({ navigation }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [deleteEnabled, setDeleteEnabled] = useState(false);
 
   useEffect(() => {
     fetchProfile();
+    authService.getAppConfig('delete_account_enabled').then((val) => {
+      setDeleteEnabled(val === true || val === 'true');
+    });
   }, []);
 
   const fetchProfile = async () => {
@@ -175,7 +179,7 @@ export default function ProfileScreen({ navigation }) {
         />
       </View>
 
-      {/* Logout Button */}
+      {/* Logout / Delete */}
       <View style={styles.section}>
         <ProfileOption
           icon={LogOut}
@@ -184,6 +188,15 @@ export default function ProfileScreen({ navigation }) {
           showArrow={false}
           danger={true}
         />
+        {deleteEnabled && (
+          <ProfileOption
+            icon={Trash2}
+            title="Delete Account"
+            onPress={() => navigation.navigate('DeleteAccount')}
+            showArrow={true}
+            danger={true}
+          />
+        )}
       </View>
 
       <View style={styles.footer}>

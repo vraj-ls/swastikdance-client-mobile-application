@@ -624,6 +624,17 @@ class AuthService {
       throw error.response?.data?.message || error.message || 'Failed to mark all as read';
     }
   }
+
+  async getAppConfig(key) {
+    try {
+      const response = await axios.get(`${API_URL}/config/${key}`);
+      if (!response.data.success) return null;
+      return response.data.payload?.value ?? null;
+    } catch (error) {
+      console.error('🔴 AuthService: getAppConfig error:', error);
+      return null;
+    }
+  }
 }
 
 // Create instance

@@ -6,12 +6,9 @@
 export const S3_BUCKET_URL = "https://swastikdance-app-bucket.s3.ap-southeast-2.amazonaws.com";
 
 // Server URLs
-export const API_URL = "https://server-swastikdance.asterisk.logicsync.net/mobile";
-export const WEB_APP_URL = "https://customer-swastikdance.appunder.dev";
-// export const WEB_APP_URL = "http://192.168.1.9:3002";
-// export const API_URL = "http://192.168.1.9:3001/mobile";
+export const API_URL = "https://server.swastikdance.logicsync.app/mobile";
+export const WEB_APP_URL = "https://app.swastikdance.com.au";
 
-// 192.168.1.5
 // API endpoints
 export const API_ENDPOINTS = {
   LOGIN: "/login",

@@ -7,7 +7,7 @@ import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { getMessaging, onMessage } from "@react-native-firebase/messaging";
 import * as Notifications from "expo-notifications";
-import InAppNotification from "./components/common/InAppNotification";
+
 
 // Keep the native splash visible until we explicitly hide it
 SplashScreen.preventAutoHideAsync();
@@ -26,6 +26,7 @@ import WebViewScreen from "./screens/WebViewScreen";
 import MainTabNavigator from "./screens/MainTabNavigator";
 import NotificationSettingsScreen from "./screens/NotificationSettingsScreen";
 import NotificationDetailScreen from "./screens/NotificationDetailScreen";
+import DeleteAccountScreen from "./screens/DeleteAccountScreen";
 
 // Services
 import authService from "./services/authService";
@@ -65,7 +66,6 @@ const linking = {
 export default function App() {
   const [appReady, setAppReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [foregroundNotification, setForegroundNotification] = useState(null);
   const navigationRef = useRef(null);
 
   useEffect(() => {
@@ -83,9 +83,6 @@ export default function App() {
       console.log('🔔 ============================================');
       const title = remoteMessage.notification?.title ?? remoteMessage.data?.title ?? "Swastik Dance";
       const body  = remoteMessage.notification?.body  ?? remoteMessage.data?.body  ?? "";
-
-      console.log('🔔 [FCM] Showing in-app banner — title:', title, '| body:', body);
-      setForegroundNotification({ title, body, data: remoteMessage.data ?? {} });
 
       try {
         await Notifications.scheduleNotificationAsync({
@@ -203,18 +200,13 @@ export default function App() {
             component={NotificationDetailScreen}
             options={{ title: "Notification" }}
           />
+          <Stack.Screen
+            name="DeleteAccount"
+            component={DeleteAccountScreen}
+            options={{ title: "Delete Account" }}
+          />
         </Stack.Navigator>
       </NavigationContainer>
-
-      <InAppNotification
-        notification={foregroundNotification}
-        onDismiss={() => setForegroundNotification(null)}
-        onTap={(notification) => {
-          setForegroundNotification(null);
-          notificationService.handleNotificationTap({ request: { content: { data: notification.data } } });
-        }}
-      />
-
 
     </SafeAreaProvider>
   );
