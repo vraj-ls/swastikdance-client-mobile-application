@@ -131,15 +131,16 @@ export default function App() {
 
       // Fetch and cache app config (feature flags + version requirements)
       const config = await authService.getFullAppConfig();
-      if (config && Object.keys(config).length > 0) {
-        await authService.cacheAppConfig(config);
-      }
+      await authService.cacheAppConfig(config);
 
       // Check if force update is required
       const minVersion = Platform.OS === 'ios'
         ? config?.min_version_ios
         : config?.min_version_android;
-      const currentVersion = Constants.nativeAppVersion;
+      const currentVersion =
+        Constants.nativeAppVersion ??
+        Constants.expoConfig?.version ??
+        '0.0.0';
       console.log(`App.js: Version check — min: ${minVersion}, current: ${currentVersion}`);
       if (needsUpdate(minVersion, currentVersion)) {
         setStoreUrls({
