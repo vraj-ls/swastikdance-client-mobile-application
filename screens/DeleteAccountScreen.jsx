@@ -27,7 +27,6 @@ export default function DeleteAccountScreen({ navigation }) {
   const [otherText, setOtherText] = useState('');
   const [comments, setComments] = useState('');
   const [confirmed, setConfirmed] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
 
   const toggleReason = (id) => {
     setSelectedReasons((prev) =>
@@ -36,11 +35,10 @@ export default function DeleteAccountScreen({ navigation }) {
   };
 
   const isOtherSelected = selectedReasons.includes('other');
-  const canSubmit = selectedReasons.length > 0 && confirmed && !submitted;
+  const canSubmit = selectedReasons.length > 0 && confirmed;
 
   const handleSubmit = () => {
     if (!canSubmit) return;
-    setSubmitted(true);
     Alert.alert(
       'Request Submitted',
       'Your request has been sent successfully. Please wait while we get back to you.',
@@ -58,48 +56,48 @@ export default function DeleteAccountScreen({ navigation }) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Warning banner */}
-        <View style={styles.warningBox}>
-          <Text style={styles.warningTitle}>⚠️  This action is permanent</Text>
-          <Text style={styles.warningText}>
-            Submitting this form will send a deletion request to our team. Once
-            processed, your account and all associated data cannot be recovered.
-          </Text>
-        </View>
+        <View style={styles.content}>
 
-        {/* Reasons */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Why are you leaving? *</Text>
-          <Text style={styles.sectionSubtitle}>Select all that apply</Text>
-          {REASONS.map((reason) => {
-            const checked = selectedReasons.includes(reason.id);
-            return (
-              <TouchableOpacity
-                key={reason.id}
-                style={styles.checkRow}
-                onPress={() => toggleReason(reason.id)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
-                  {checked && <Text style={styles.checkmark}>✓</Text>}
-                </View>
-                <Text style={styles.checkLabel}>{reason.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
+          {/* Warning notice */}
+          <View style={styles.notice}>
+            <Text style={styles.noticeTitle}>Permanent action</Text>
+            <Text style={styles.noticeText}>
+              Once processed, your account and all associated data cannot be recovered.
+            </Text>
+          </View>
 
-          {isOtherSelected && (
-            <TextInput
-              placeholder="Please specify..."
-              value={otherText}
-              onChangeText={setOtherText}
-              style={styles.otherInput}
-            />
-          )}
-        </View>
+          {/* Reasons */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Why are you leaving? *</Text>
+            <Text style={styles.hint}>Select all that apply</Text>
+            {REASONS.map((reason) => {
+              const checked = selectedReasons.includes(reason.id);
+              return (
+                <TouchableOpacity
+                  key={reason.id}
+                  style={styles.checkRow}
+                  onPress={() => toggleReason(reason.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+                    {checked && <Text style={styles.checkmark}>✓</Text>}
+                  </View>
+                  <Text style={styles.checkLabel}>{reason.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
 
-        {/* Additional comments */}
-        <View style={styles.section}>
+            {isOtherSelected && (
+              <TextInput
+                placeholder="Please specify..."
+                value={otherText}
+                onChangeText={setOtherText}
+                style={styles.otherInput}
+              />
+            )}
+          </View>
+
+          {/* Additional comments */}
           <TextInput
             label="Additional comments (optional)"
             placeholder="Any other feedback you'd like to share..."
@@ -108,35 +106,34 @@ export default function DeleteAccountScreen({ navigation }) {
             multiline
             numberOfLines={4}
           />
-        </View>
 
-        {/* Confirmation checkbox */}
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={styles.checkRow}
-            onPress={() => setConfirmed((v) => !v)}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.checkbox, confirmed && styles.checkboxChecked]}>
-              {confirmed && <Text style={styles.checkmark}>✓</Text>}
-            </View>
-            <Text style={[styles.checkLabel, styles.confirmLabel]}>
-              I understand this is a permanent action and all my data will be deleted *
-            </Text>
-          </TouchableOpacity>
-        </View>
+          {/* Confirmation */}
+          <View style={styles.field}>
+            <TouchableOpacity
+              style={styles.checkRow}
+              onPress={() => setConfirmed((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.checkbox, confirmed && styles.checkboxChecked]}>
+                {confirmed && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+              <Text style={[styles.checkLabel, styles.confirmText]}>
+                I understand this is permanent and all my data will be deleted *
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-        {/* Submit */}
-        <View style={styles.section}>
           <Button
             onPress={handleSubmit}
             disabled={!canSubmit}
-            variant="secondary"
-            style={[styles.submitButton, !canSubmit && styles.submitDisabled]}
+            variant="primary"
+            style={styles.button}
           >
-            Submit Deletion Request
+            Submit Request
           </Button>
+
           <Text style={styles.note}>* Required</Text>
+
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -149,39 +146,46 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   scrollContent: {
-    padding: spacing.md,
-    paddingBottom: spacing.xxl,
+    flexGrow: 1,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl + 50,
   },
-  warningBox: {
-    backgroundColor: '#fff7ed',
-    borderLeftWidth: 4,
-    borderLeftColor: colors.warning,
+  content: {
+    padding: spacing.lg,
+    maxWidth: 500,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  notice: {
+    backgroundColor: 'rgba(229, 90, 40, 0.08)',
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.lg,
   },
-  warningTitle: {
+  noticeTitle: {
     fontSize: typography.sizes.sm,
     fontWeight: typography.weights.semibold,
-    color: '#92400e',
+    color: colors.primary,
     marginBottom: spacing.xs,
   },
-  warningText: {
+  noticeText: {
     fontSize: typography.sizes.sm,
-    color: '#92400e',
+    color: colors.textSecondary,
     lineHeight: 20,
   },
-  section: {
-    marginBottom: spacing.lg,
+  field: {
+    marginBottom: spacing.md,
   },
-  sectionTitle: {
-    fontSize: typography.sizes.md,
+  label: {
+    fontSize: typography.sizes.sm,
     fontWeight: typography.weights.semibold,
     color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
-  sectionSubtitle: {
-    fontSize: typography.sizes.sm,
+  hint: {
+    fontSize: typography.sizes.xs,
     color: colors.textSecondary,
     marginBottom: spacing.md,
   },
@@ -204,8 +208,8 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   checkboxChecked: {
-    backgroundColor: colors.secondary,
-    borderColor: colors.secondary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   checkmark: {
     color: colors.white,
@@ -219,19 +223,17 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 22,
   },
-  confirmLabel: {
+  confirmText: {
     fontSize: typography.sizes.sm,
     color: colors.textSecondary,
   },
   otherInput: {
-    marginTop: spacing.xs,
     marginLeft: 22 + spacing.md,
+    marginTop: spacing.xs,
   },
-  submitButton: {
+  button: {
+    marginTop: spacing.md,
     marginBottom: spacing.sm,
-  },
-  submitDisabled: {
-    opacity: 0.5,
   },
   note: {
     fontSize: typography.sizes.xs,
