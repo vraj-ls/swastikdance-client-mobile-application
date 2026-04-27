@@ -136,12 +136,16 @@ export default function App() {
       }
 
       // Check if force update is required
-      const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-      const minVersion = config?.min_version?.[platform];
+      const minVersion = Platform.OS === 'ios'
+        ? config?.min_version_ios
+        : config?.min_version_android;
       const currentVersion = Constants.nativeAppVersion;
       console.log(`App.js: Version check — min: ${minVersion}, current: ${currentVersion}`);
       if (needsUpdate(minVersion, currentVersion)) {
-        setStoreUrls(config?.store_urls ?? {});
+        setStoreUrls({
+          android: config?.store_url_android,
+          ios: config?.store_url_ios,
+        });
         setForceUpdate(true);
       }
     } catch (error) {
