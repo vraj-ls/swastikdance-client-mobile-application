@@ -157,9 +157,9 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   notice: {
-    backgroundColor: 'rgba(229, 90, 40, 0.08)',
-    borderLeftWidth: 3,
-    borderLeftColor: colors.primary,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.divider,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.lg,
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   noticeTitle: {
     fontSize: typography.sizes.sm,
     fontWeight: typography.weights.semibold,
-    color: colors.primary,
+    color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
   noticeText: {
