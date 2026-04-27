@@ -3,6 +3,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Platform, View, StyleSheet } from "react-native";
 import Constants from "expo-constants";
+import appJson from './app.json';
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
@@ -140,6 +141,7 @@ export default function App() {
       const currentVersion =
         Constants.nativeAppVersion ??
         Constants.expoConfig?.version ??
+        appJson.version ??
         '0.0.0';
       console.log(`App.js: Version check — min: ${minVersion}, current: ${currentVersion}`);
       if (needsUpdate(minVersion, currentVersion)) {

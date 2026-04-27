@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Edit, Lock, Bell, LogOut, ChevronRight, UserPlus, Wallet, Trash2 } from 'lucide-react-native';
+import Constants from 'expo-constants';
+import appJson from '../app.json';
 import { Button } from '../components/common/Button';
 import { colors, spacing, typography, borderRadius } from '../constants/theme';
 import authService from '../services/authService';
@@ -200,7 +202,9 @@ export default function ProfileScreen({ navigation }) {
       </View>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Swastik Dance App v1.0.0</Text>
+        <Text style={styles.footerText}>
+          Swastik Dance App v{Constants.nativeAppVersion ?? Constants.expoConfig?.version ?? appJson.version ?? '1.0.0'}
+        </Text>
       </View>
     </ScrollView>
   );
