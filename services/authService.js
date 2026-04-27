@@ -635,6 +635,35 @@ class AuthService {
       return null;
     }
   }
+
+  async getFullAppConfig() {
+    try {
+      const response = await axios.get(`${API_URL}/app-config`);
+      if (!response.data.success) return {};
+      return response.data.payload ?? {};
+    } catch (error) {
+      console.error('🔴 AuthService: getFullAppConfig error:', error);
+      return {};
+    }
+  }
+
+  async cacheAppConfig(config) {
+    try {
+      await AsyncStorage.setItem('app_config', JSON.stringify(config));
+    } catch (error) {
+      console.error('🔴 AuthService: cacheAppConfig error:', error);
+    }
+  }
+
+  async getCachedAppConfig() {
+    try {
+      const raw = await AsyncStorage.getItem('app_config');
+      return raw ? JSON.parse(raw) : {};
+    } catch (error) {
+      console.error('🔴 AuthService: getCachedAppConfig error:', error);
+      return {};
+    }
+  }
 }
 
 // Create instance

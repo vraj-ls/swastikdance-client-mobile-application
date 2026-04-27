@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState, useRef } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Platform, View, StyleSheet } from "react-native";
+import Constants from "expo-constants";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
@@ -27,6 +28,7 @@ import MainTabNavigator from "./screens/MainTabNavigator";
 import NotificationSettingsScreen from "./screens/NotificationSettingsScreen";
 import NotificationDetailScreen from "./screens/NotificationDetailScreen";
 import DeleteAccountScreen from "./screens/DeleteAccountScreen";
+import ForceUpdateModal from "./components/common/ForceUpdateModal";
 
 // Services
 import authService from "./services/authService";
@@ -63,9 +65,22 @@ const linking = {
   },
 };
 
+const needsUpdate = (minVer, currentVer) => {
+  if (!minVer || !currentVer) return false;
+  const a = String(minVer).split('.').map(Number);
+  const b = String(currentVer).split('.').map(Number);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if ((a[i] ?? 0) > (b[i] ?? 0)) return true;
+    if ((a[i] ?? 0) < (b[i] ?? 0)) return false;
+  }
+  return false;
+};
+
 export default function App() {
   const [appReady, setAppReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [forceUpdate, setForceUpdate] = useState(false);
+  const [storeUrls, setStoreUrls] = useState({});
   const navigationRef = useRef(null);
 
   useEffect(() => {
@@ -113,6 +128,22 @@ export default function App() {
       const loggedIn = await authService.isLoggedIn();
       console.log("App.js: User logged in:", loggedIn);
       setIsLoggedIn(loggedIn);
+
+      // Fetch and cache app config (feature flags + version requirements)
+      const config = await authService.getFullAppConfig();
+      if (config && Object.keys(config).length > 0) {
+        await authService.cacheAppConfig(config);
+      }
+
+      // Check if force update is required
+      const platform = Platform.OS === 'ios' ? 'ios' : 'android';
+      const minVersion = config?.min_version?.[platform];
+      const currentVersion = Constants.nativeAppVersion;
+      console.log(`App.js: Version check — min: ${minVersion}, current: ${currentVersion}`);
+      if (needsUpdate(minVersion, currentVersion)) {
+        setStoreUrls(config?.store_urls ?? {});
+        setForceUpdate(true);
+      }
     } catch (error) {
       console.error("App.js: Error checking auth status:", error);
     } finally {
@@ -132,6 +163,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
+      <ForceUpdateModal visible={forceUpdate} storeUrls={storeUrls} />
 
       <NavigationContainer ref={navigationRef} linking={linking} onReady={handleNavigationReady}>
         <Stack.Navigator

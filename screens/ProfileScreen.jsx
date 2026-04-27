@@ -22,8 +22,8 @@ export default function ProfileScreen({ navigation }) {
 
   useEffect(() => {
     fetchProfile();
-    authService.getAppConfig('delete_account_enabled').then((val) => {
-      setDeleteEnabled(val === true || val === 'true');
+    authService.getCachedAppConfig().then((config) => {
+      setDeleteEnabled(config?.delete_account_enabled === true);
     });
   }, []);
 
