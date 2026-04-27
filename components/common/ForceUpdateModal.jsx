@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, View, Text, StyleSheet, Platform, Linking, TouchableOpacity } from 'react-native';
+import { RefreshCw } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius } from '../../constants/theme';
 
 export default function ForceUpdateModal({ visible, storeUrls = {} }) {
@@ -22,21 +23,18 @@ export default function ForceUpdateModal({ visible, storeUrls = {} }) {
       <View style={styles.overlay}>
         <View style={styles.popup}>
 
-          {/* Orange accent header */}
-          <View style={styles.accentBar}>
-            <Text style={styles.accentIcon}>↑</Text>
+          <View style={styles.iconCircle}>
+            <RefreshCw color={colors.white} size={32} strokeWidth={2.5} />
           </View>
 
-          <View style={styles.body}>
-            <Text style={styles.title}>Update Available</Text>
-            <Text style={styles.subtitle}>
-              A new version of Swastik Dance is available. Update now to get the latest features and improvements.
-            </Text>
+          <Text style={styles.title}>Update Available</Text>
+          <Text style={styles.subtitle}>
+            A new version of Swastik Dance is available. Update now to get the latest features and improvements.
+          </Text>
 
-            <TouchableOpacity style={styles.button} onPress={handleUpdate} activeOpacity={0.85}>
-              <Text style={styles.buttonText}>Update Now</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.button} onPress={handleUpdate} activeOpacity={0.85}>
+            <Text style={styles.buttonText}>Update Now</Text>
+          </TouchableOpacity>
 
         </View>
       </View>
@@ -55,29 +53,24 @@ const styles = StyleSheet.create({
   popup: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.xl,
+    padding: spacing.xl,
     width: '100%',
     maxWidth: 340,
-    overflow: 'hidden',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 12,
   },
-  accentBar: {
+  iconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: borderRadius.full,
     backgroundColor: colors.primary,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  accentIcon: {
-    fontSize: 32,
-    color: colors.white,
-    fontWeight: typography.weights.bold,
-  },
-  body: {
-    padding: spacing.xl,
     alignItems: 'center',
+    marginBottom: spacing.lg,
   },
   title: {
     fontSize: typography.sizes.xl,
