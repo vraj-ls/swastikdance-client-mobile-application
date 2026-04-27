@@ -1,6 +1,5 @@
 import React from 'react';
-import { Modal, View, Text, StyleSheet, Platform, Linking } from 'react-native';
-import { Button } from './Button';
+import { Modal, View, Text, StyleSheet, Platform, Linking, TouchableOpacity } from 'react-native';
 import { colors, spacing, typography, borderRadius } from '../../constants/theme';
 
 export default function ForceUpdateModal({ visible, storeUrls = {} }) {
@@ -22,13 +21,23 @@ export default function ForceUpdateModal({ visible, storeUrls = {} }) {
     >
       <View style={styles.overlay}>
         <View style={styles.popup}>
-          <Text style={styles.title}>Update Required</Text>
-          <Text style={styles.subtitle}>
-            A new version of Swastik Dance is available. Please update to continue using the app.
-          </Text>
-          <Button onPress={handleUpdate} variant="secondary" style={styles.button}>
-            Update Now
-          </Button>
+
+          {/* Orange accent header */}
+          <View style={styles.accentBar}>
+            <Text style={styles.accentIcon}>↑</Text>
+          </View>
+
+          <View style={styles.body}>
+            <Text style={styles.title}>Update Available</Text>
+            <Text style={styles.subtitle}>
+              A new version of Swastik Dance is available. Update now to get the latest features and improvements.
+            </Text>
+
+            <TouchableOpacity style={styles.button} onPress={handleUpdate} activeOpacity={0.85}>
+              <Text style={styles.buttonText}>Update Now</Text>
+            </TouchableOpacity>
+          </View>
+
         </View>
       </View>
     </Modal>
@@ -38,7 +47,7 @@ export default function ForceUpdateModal({ visible, storeUrls = {} }) {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.lg,
@@ -46,15 +55,29 @@ const styles = StyleSheet.create({
   popup: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.xl,
-    padding: spacing.xl,
     width: '100%',
     maxWidth: 340,
-    alignItems: 'center',
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  accentBar: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accentIcon: {
+    fontSize: 32,
+    color: colors.white,
+    fontWeight: typography.weights.bold,
+  },
+  body: {
+    padding: spacing.xl,
+    alignItems: 'center',
   },
   title: {
     fontSize: typography.sizes.xl,
@@ -68,9 +91,18 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
   },
   button: {
+    backgroundColor: colors.secondary,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.md,
     width: '100%',
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: colors.white,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold,
   },
 });
