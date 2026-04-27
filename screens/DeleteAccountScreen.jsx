@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   noticeTitle: {
     fontSize: typography.sizes.sm,
     fontWeight: typography.weights.semibold,
-    color: colors.textPrimary,
+    color: colors.primary,
     marginBottom: spacing.xs,
   },
   noticeText: {
