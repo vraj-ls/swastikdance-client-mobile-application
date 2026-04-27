@@ -2,7 +2,7 @@
   "expo": {
     "name": "Swastik Dance",
     "slug": "swastikdance-mobile",
-    "version": "1.0.3",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/SD_Logo.png",
     "userInterfaceStyle": "light",
