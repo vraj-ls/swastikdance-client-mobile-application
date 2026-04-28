@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { Mail, MessageSquare, Bell, Inbox as InboxIcon } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius } from '../constants/theme';
+import { CATEGORY_LABELS, CATEGORY_COLORS } from '../constants/notifications';
+import { stripHtml } from '../utils/formatters';
 import authService from '../services/authService';
 
 const TYPE_LABELS = {
@@ -24,25 +26,6 @@ const TYPE_COLORS = {
   SMS: colors.info,
   PUSH: '#8b5cf6',
   NOTIFICATION: '#8b5cf6',
-};
-
-// Category labels for notification content type
-const CATEGORY_LABELS = {
-  SESSION_REMINDER: 'Reminders',
-  SESSION_MISSED: 'Reminders',
-  ENROLMENT_RECEIPT: 'Updates',
-  ENROLMENT_RENEWAL: 'Updates',
-  BIRTHDAY: 'Special',
-  STUDENT_WELCOME: 'Special',
-  GENERAL: 'Announcements',
-  REGISTRATION: 'Updates',
-};
-
-const CATEGORY_COLORS = {
-  Reminders: '#10b981',    // Green
-  Updates: '#f59e0b',      // Amber
-  Announcements: '#6366f1', // Indigo
-  Special: '#ec4899',      // Pink
 };
 
 const URL_REGEX = /(https?:\/\/[^\s]+)/g;
@@ -67,24 +50,6 @@ function formatFullDate(dateString) {
     hour: '2-digit',
     minute: '2-digit',
   });
-}
-
-/**
- * Strips HTML tags and converts HTML entities to readable text.
- */
-function stripHtml(html) {
-  if (!html) return '';
-  return html
-    .replace(/<br\s*\/?>/gi, '\n')  // Convert <br> to newlines
-    .replace(/<\/p>/gi, '\n\n')     // Convert </p> to double newlines
-    .replace(/<[^>]+>/g, '')         // Strip remaining HTML tags
-    .replace(/&nbsp;/g, ' ')         // Replace &nbsp; with space
-    .replace(/&amp;/g, '&')          // Replace &amp; with &
-    .replace(/&lt;/g, '<')          // Replace &lt; with <
-    .replace(/&gt;/g, '>')          // Replace &gt; with >
-    .replace(/&quot;/g, '"')        // Replace &quot; with "
-    .replace(/&#39;/g, "'")         // Replace &#39; with '
-    .trim();
 }
 
 /**
@@ -147,10 +112,10 @@ export default function NotificationDetailScreen({ route }) {
     );
   }
 
-  // Get category from detail (notification content type) or fall back to type (channel)
-  const categoryLabel = detail.category ? (CATEGORY_LABELS[detail.category] ?? detail.category) : null;
+  // Get category from detail (notification content type), fall back to "General"
+  const categoryLabel = detail.category ? (CATEGORY_LABELS[detail.category] ?? detail.category) : 'General';
   const channelLabel = TYPE_LABELS[detail.type] ?? detail.type;
-  const badgeColor = categoryLabel ? (CATEGORY_COLORS[categoryLabel] ?? colors.primary) : (TYPE_COLORS[detail.type] ?? colors.primary);
+  const categoryColor = CATEGORY_COLORS[categoryLabel] ?? CATEGORY_COLORS['Announcements'];
 
   return (
     <ScrollView
@@ -158,21 +123,20 @@ export default function NotificationDetailScreen({ route }) {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      {/* Category badge */}
-      {categoryLabel && (
-        <View style={[styles.categoryBadge, { backgroundColor: badgeColor + '1A' }]}>
-          <Text style={[styles.categoryBadgeText, { color: badgeColor }]}>
+      {/* Badges row — channel + category side by side */}
+      <View style={styles.badgesRow}>
+        <View style={[styles.typeBadge, { backgroundColor: (TYPE_COLORS[detail.type] ?? colors.textSecondary) + '1A' }]}>
+          {getIcon(detail.type, TYPE_COLORS[detail.type] ?? colors.textSecondary)}
+          <Text style={[styles.typeBadgeText, { color: TYPE_COLORS[detail.type] ?? colors.textSecondary }]}>
+            {channelLabel}
+          </Text>
+        </View>
+
+        <View style={[styles.categoryBadge, { backgroundColor: categoryColor + '1A' }]}>
+          <Text style={[styles.categoryBadgeText, { color: categoryColor }]}>
             {categoryLabel}
           </Text>
         </View>
-      )}
-
-      {/* Channel badge */}
-      <View style={[styles.typeBadge, { backgroundColor: (TYPE_COLORS[detail.type] ?? colors.textSecondary) + '1A' }]}>
-        {getIcon(detail.type, TYPE_COLORS[detail.type] ?? colors.textSecondary)}
-        <Text style={[styles.typeBadgeText, { color: TYPE_COLORS[detail.type] ?? colors.textSecondary }]}>
-          {channelLabel}
-        </Text>
       </View>
 
       {/* Title */}
@@ -205,15 +169,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.background,
   },
+  badgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
   typeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.xxl,
     gap: spacing.sm,
-    marginBottom: spacing.md,
   },
   typeBadgeText: {
     fontSize: typography.sizes.sm,
@@ -222,12 +191,9 @@ const styles = StyleSheet.create({
   categoryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.xxl,
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
   },
   categoryBadgeText: {
     fontSize: typography.sizes.sm,

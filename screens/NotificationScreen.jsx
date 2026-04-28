@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   FlatList,
+  ScrollView,
   RefreshControl,
   ActivityIndicator,
   Alert,
@@ -12,6 +13,8 @@ import {
 import { Bell } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { colors, spacing, typography, borderRadius } from '../constants/theme';
+import { CATEGORY_LABELS, CATEGORY_COLORS, CATEGORY_RAW_MAP, FILTER_TABS } from '../constants/notifications';
+import { stripHtml } from '../utils/formatters';
 import authService from '../services/authService';
 import notificationService from '../services/notificationService';
 
@@ -21,29 +24,15 @@ export default function NotificationScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [filter, setFilter] = useState('all'); // 'all', 'unread', 'email', 'sms', 'push'
+  const [filter, setFilter] = useState('All');
 
-  // Fetch inbox messages
+  // Fetch inbox messages (always fetch all; filtering is done client-side)
   const fetchInbox = useCallback(
     async (showLoader = true) => {
       try {
         if (showLoader) setLoading(true);
 
-        let filterParams = {};
-        if (filter === 'unread') {
-          filterParams.read = false;
-        } else if (filter === 'email') {
-          filterParams.type = 'EMAIL';
-        } else if (filter === 'sms') {
-          filterParams.type = 'SMS';
-        } else if (filter === 'push') {
-          filterParams.type = 'PUSH';
-        }
-
-        const data = await authService.getInbox(
-          filterParams.type,
-          filterParams.read
-        );
+        const data = await authService.getInbox();
 
         setMessages(data.messages || []);
         setUnreadCount(data.unreadCount || 0);
@@ -58,7 +47,7 @@ export default function NotificationScreen() {
         setRefreshing(false);
       }
     },
-    [filter]
+    []
   );
 
   // Initial load
@@ -81,6 +70,16 @@ export default function NotificationScreen() {
     setRefreshing(true);
     fetchInbox(false);
   };
+
+  // Client-side filtering based on selected tab
+  const displayedMessages = useMemo(() => {
+    if (filter === 'Unread') return messages.filter((m) => !m.read);
+    if (CATEGORY_RAW_MAP[filter]) {
+      const rawCategories = CATEGORY_RAW_MAP[filter];
+      return messages.filter((m) => rawCategories.includes(m.category));
+    }
+    return messages; // 'All'
+  }, [messages, filter]);
 
   // Open detail screen — marks as read handled inside detail screen
   const handleOpenMessage = (item) => {
@@ -118,62 +117,93 @@ export default function NotificationScreen() {
   };
 
   // Render message item
-  const renderMessageItem = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.messageCard, !item.read && styles.unreadCard]}
-      onPress={() => handleOpenMessage(item)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.messageContent}>
-        <Text style={styles.messageTitle} numberOfLines={1}>
-          {item.title || item.subject}
-        </Text>
-        <Text style={styles.messageBody} numberOfLines={2}>
-          {item.body}
-        </Text>
-        <Text style={styles.messageTime}>{formatDate(item.createdAt)}</Text>
-      </View>
+  const renderMessageItem = ({ item }) => {
+    const categoryLabel = item.category ? CATEGORY_LABELS[item.category] : null;
+    const categoryColor = categoryLabel ? CATEGORY_COLORS[categoryLabel] : null;
 
-      {!item.read && <View style={styles.unreadDot} />}
-    </TouchableOpacity>
-  );
+    return (
+      <TouchableOpacity
+        style={[styles.messageCard, !item.read && styles.unreadCard]}
+        onPress={() => handleOpenMessage(item)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.messageContent}>
+          {/* Header row: category badge (left) + timestamp (right) */}
+          <View style={styles.messageHeader}>
+            {categoryLabel ? (
+              <View style={[styles.categoryBadge, { backgroundColor: categoryColor + '20' }]}>
+                <Text style={[styles.categoryBadgeText, { color: categoryColor }]}>
+                  {categoryLabel}
+                </Text>
+              </View>
+            ) : (
+              <View />
+            )}
+            <Text style={styles.messageTime}>{formatDate(item.createdAt)}</Text>
+          </View>
+          <Text style={styles.messageTitle} numberOfLines={1}>
+            {item.title || item.subject}
+          </Text>
+          <Text style={styles.messageBody} numberOfLines={2}>
+            {stripHtml(item.body)}
+          </Text>
+        </View>
+
+        {!item.read && <View style={styles.unreadDot} />}
+      </TouchableOpacity>
+    );
+  };
 
   // Render filter tabs
   const renderFilterTabs = () => (
     <View style={styles.filterContainer}>
-      {['all', 'unread'].map((tab) => (
-        <TouchableOpacity
-          key={tab}
-          style={[styles.filterTab, filter === tab && styles.filterTabActive]}
-          onPress={() => setFilter(tab)}
-        >
-          <Text
-            style={[
-              styles.filterText,
-              filter === tab && styles.filterTextActive,
-            ]}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        overScrollMode="never"
+        contentContainerStyle={styles.filterContent}
+      >
+        {FILTER_TABS.map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            style={[styles.filterTab, filter === tab && styles.filterTabActive]}
+            onPress={() => setFilter(tab)}
           >
-            {tab === 'unread' && unreadCount > 0
-              ? `Unread (${unreadCount})`
-              : tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </Text>
-        </TouchableOpacity>
-      ))}
+            <Text
+              style={[
+                styles.filterText,
+                filter === tab && styles.filterTextActive,
+              ]}
+            >
+              {tab === 'Unread' && unreadCount > 0
+                ? `Unread (${unreadCount})`
+                : tab}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
     </View>
   );
 
   // Render empty state
-  const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <Bell color={colors.textTertiary} size={64} />
-      <Text style={styles.emptyTitle}>No Messages</Text>
-      <Text style={styles.emptyText}>
-        {filter === 'unread'
-          ? "You're all caught up!"
-          : "You don't have any messages yet"}
-      </Text>
-    </View>
-  );
+  const renderEmptyState = () => {
+    let emptyText;
+    if (filter === 'Unread') {
+      emptyText = "You're all caught up!";
+    } else if (CATEGORY_RAW_MAP[filter]) {
+      emptyText = `No ${filter} messages`;
+    } else {
+      emptyText = "You don't have any messages yet";
+    }
+
+    return (
+      <View style={styles.emptyContainer}>
+        <Bell color={colors.textTertiary} size={64} />
+        <Text style={styles.emptyTitle}>No Messages</Text>
+        <Text style={styles.emptyText}>{emptyText}</Text>
+      </View>
+    );
+  };
 
   if (loading) {
     return (
@@ -188,12 +218,12 @@ export default function NotificationScreen() {
       {renderFilterTabs()}
 
       <FlatList
-        data={messages}
+        data={displayedMessages}
         renderItem={renderMessageItem}
         keyExtractor={(item) => item._id}
         contentContainerStyle={[
           styles.listContainer,
-          messages.length === 0 && styles.listContainerEmpty,
+          displayedMessages.length === 0 && styles.listContainerEmpty,
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -221,11 +251,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   filterContainer: {
-    flexDirection: 'row',
-    padding: spacing.sm,
     backgroundColor: colors.white,
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
+    overflow: 'hidden',
+  },
+  filterContent: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
   },
   filterTab: {
     paddingHorizontal: spacing.md - spacing.xs,
@@ -247,6 +281,7 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
+    paddingBottom: 120,
   },
   listContainerEmpty: {
     flex: 1,
@@ -277,11 +312,26 @@ const styles = StyleSheet.create({
   messageBody: {
     fontSize: typography.sizes.sm,
     color: colors.textSecondary,
-    marginBottom: spacing.sm - spacing.xs,
+  },
+  messageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
   },
   messageTime: {
     fontSize: typography.sizes.xs,
     color: colors.textSecondary,
+  },
+  categoryBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.xxl,
+  },
+  categoryBadgeText: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold,
   },
   unreadDot: {
     width: spacing.sm,
