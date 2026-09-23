@@ -231,11 +231,15 @@ class AuthService {
   // Upload student picture to S3 and save path via GraphQL (matches admin/client pattern)
   async uploadStudentPicture(studentId, uri, contentType) {
     const baseUrl = API_URL.replace('/mobile', '');
-    const picturePath = `pictures/${studentId}.jpg`;
+    // Versioned key: `<id>_<unix seconds>.jpg` — matches admin/client. Each upload writes a NEW
+    // object instead of overwriting in place, so the URL changes with the picture and the image
+    // can be cached hard without ever going stale. Legacy `<id>.jpg` keys keep resolving.
+    const filename = `${studentId}_${Math.floor(Date.now() / 1000)}.jpg`;
+    const picturePath = `pictures/${filename}`;
 
     // 1. Get presigned S3 URL (same collection/filename as admin/client)
     const urlRes = await axios.get(`${baseUrl}/api/upload/url`, {
-      params: { collection: 'pictures', filename: `${studentId}.jpg`, contentType: 'image/jpeg' },
+      params: { collection: 'pictures', filename, contentType: 'image/jpeg' },
       timeout: 15000,
     });
     const { url } = urlRes.data;
